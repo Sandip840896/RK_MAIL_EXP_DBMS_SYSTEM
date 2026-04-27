@@ -356,7 +356,7 @@
       .chart-container { height: 180px; }
     }
   </style>
-<base target="_blank">
+
 </head>
 <body>
   <!-- Login Screen -->
@@ -2440,78 +2440,68 @@ function handleLogin() {
     return;
   }
 
-  // 🔥 Fetch user from Firebase DB
-  db.ref('users').once('value')
-    .then(snapshot => {
-      const users = snapshot.val();
+  firebase.auth().signInWithEmailAndPassword(email, password)
+    .then((userCredential) => {
+      const user = userCredential.user;
 
-      if (!users) {
-        throw new Error("No users found in database");
+      console.log("✅ Login Success:", user.email);
+
+      // 🔥 ROLE SETUP
+      let role = "viewer"; // default
+
+      if (user.email === "sandipnandi2000@gmail.com") {
+        role = "admin";
+      } else if (user.email === "demo@rkgroup.com") {
+        role = "viewer";
       }
 
-      let foundUser = null;
+      currentUser = {
+        name: user.email,
+        email: user.email,
+        role: role
+      };
 
-      Object.keys(users).forEach(key => {
-        const u = users[key];
-        if (
-          u.email.toLowerCase() === email.toLowerCase() &&
-          u.password === password &&
-          u.active === true
-        ) {
-          foundUser = u;
-        }
-      });
-
-      if (foundUser) {
-        currentUser = foundUser;
-        errorDiv.classList.add('hidden');
-        showApp();
-      } else {
-        errorDiv.textContent = 'Invalid credentials';
-        errorDiv.classList.remove('hidden');
-      }
+      errorDiv.classList.add('hidden');
+      showApp();
     })
-    .catch(err => {
-      console.error(err);
-      errorDiv.textContent = 'Login error. Check console.';
+    .catch((error) => {
+      console.error(error);
+      errorDiv.textContent = "Invalid email or password";
       errorDiv.classList.remove('hidden');
     });
 }
 
 
-// Demo Login (auto-create if not exists)
-function useDemoLogin() {
-  const demoUser = {
-    name: "Demo User",
-    email: "demo",
-    password: "Demo@1234",
-    role: "viewer",
-    active: true
-  };
+// ==================== DEMO LOGIN ====================
 
-  db.ref('users/demo').set(demoUser).then(() => {
-    document.getElementById('loginEmail').value = 'demo';
-    document.getElementById('loginPassword').value = 'Demo@1234';
-    handleLogin();
+function useDemoLogin() {
+  document.getElementById('loginEmail').value = 'demo@rkgroup.com';
+  document.getElementById('loginPassword').value = 'Demo@1234';
+
+  // 🔥 Auto login after fill
+  handleLogin();
+}
+
+
+// ==================== LOGOUT ====================
+
+function handleLogout() {
+  firebase.auth().signOut().then(() => {
+    currentUser = null;
+
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'none';
+
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+
+    closeSidebar();
   });
 }
 
 
-// Logout
-function handleLogout() {
-  currentUser = null;
+// ==================== SHOW APP ====================
 
-  document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('appContainer').style.display = 'none';
-
-  document.getElementById('loginEmail').value = '';
-  document.getElementById('loginPassword').value = '';
-
-  closeSidebar();
-}
-
-
-// Show App
 function showApp() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appContainer').style.display = 'block';
@@ -2523,7 +2513,6 @@ function showApp() {
   setupReadOnlyUi();
   showPage('dashboard');
 }
-
     // ==================== DATE RANGE HELPERS ====================
     function setDefaultDateRanges() {
       const now = new Date();
