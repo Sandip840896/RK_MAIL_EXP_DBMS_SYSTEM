@@ -2366,34 +2366,76 @@ console.log("✅ Connected to NEW Firebase");
       initApp();
     });
 
-    function initApp() {
-      loadData();
+    async function initApp() {
+      initFirebase();
+      await loadData();
       setupEventListeners();
       setDefaultDates();
-      initFirebase(); // Initialize Firebase if configured
     }
 
-    function loadData() {
+    async function loadData() {
+      if (firebaseInitialized) {
+        try {
+          const snapshot = await firebaseDb.ref('rkGroupData').once('value');
+          const cloudData = snapshot.val();
+          if (cloudData) {
+            appData = cloudData;
+            const saved = localStorage.getItem('rkGroupData');
+            if (saved) {
+              try {
+                const localData = JSON.parse(saved);
+                if ((localData.users || []).length > (cloudData.users || []).length) {
+                  appData.users = mergeUsers(cloudData.users || [], localData.users || []);
+                }
+              } catch (error) {
+                console.warn('Could not merge local users with Firebase users.', error);
+              }
+            }
+            normalizeAppData();
+            localStorage.setItem('rkGroupData', JSON.stringify(appData));
+            autoSyncToCloud();
+            return;
+          }
+        } catch (error) {
+          console.warn('Could not load Firebase data. Using local data instead.', error);
+        }
+      }
+
       const saved = localStorage.getItem('rkGroupData');
       if (saved) {
         appData = JSON.parse(saved);
-        if (!appData.yards) appData.yards = DEFAULT_DATA.yards;
-        if (!appData.clusterManagers) appData.clusterManagers = DEFAULT_DATA.clusterManagers;
-        if (!appData.trainManagers) appData.trainManagers = DEFAULT_DATA.trainManagers;
-        if (!appData.rakeManagers) appData.rakeManagers = DEFAULT_DATA.rakeManagers;
-        if (!appData.trainManagerHierarchy) appData.trainManagerHierarchy = DEFAULT_DATA.trainManagerHierarchy;
-        if (!appData.rakeManagerHierarchy) appData.rakeManagerHierarchy = DEFAULT_DATA.rakeManagerHierarchy;
-        if (!appData.trainMasters) appData.trainMasters = DEFAULT_DATA.trainMasters;
-        if (!appData.sales) appData.sales = DEFAULT_DATA.sales;
-        if (!appData.complaints) appData.complaints = DEFAULT_DATA.complaints;
-        if (!appData.cash) appData.cash = DEFAULT_DATA.cash;
-        if (!appData.users) appData.users = DEFAULT_DATA.users;
-        hydrateManagerHierarchyFromMasters();
-        ensureSystemUsers();
+        normalizeAppData();
       } else {
         appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
         saveData();
       }
+    }
+
+    function mergeUsers(cloudUsers, localUsers) {
+      const byEmail = new Map();
+      [...cloudUsers, ...localUsers].forEach(user => {
+        if (!user || !user.email) return;
+        byEmail.set(String(user.email).toLowerCase(), user);
+      });
+      return [...byEmail.values()];
+    }
+
+    function normalizeAppData() {
+      if (!appData || typeof appData !== 'object') appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+      if (!appData.yards) appData.yards = DEFAULT_DATA.yards;
+      if (!appData.clusterManagers) appData.clusterManagers = DEFAULT_DATA.clusterManagers;
+      if (!appData.trainManagers) appData.trainManagers = DEFAULT_DATA.trainManagers;
+      if (!appData.rakeManagers) appData.rakeManagers = DEFAULT_DATA.rakeManagers;
+      if (!appData.trainManagerHierarchy) appData.trainManagerHierarchy = DEFAULT_DATA.trainManagerHierarchy;
+      if (!appData.rakeManagerHierarchy) appData.rakeManagerHierarchy = DEFAULT_DATA.rakeManagerHierarchy;
+      if (!appData.trainMasters) appData.trainMasters = DEFAULT_DATA.trainMasters;
+      if (!appData.sales) appData.sales = DEFAULT_DATA.sales;
+      if (!appData.complaints) appData.complaints = DEFAULT_DATA.complaints;
+      if (!appData.cash) appData.cash = DEFAULT_DATA.cash;
+      if (!appData.users) appData.users = DEFAULT_DATA.users;
+      hydrateManagerHierarchyFromMasters();
+      ensureSystemUsers();
+      localStorage.setItem('rkGroupData', JSON.stringify(appData));
     }
 
     function hydrateManagerHierarchyFromMasters() {
@@ -6205,18 +6247,18 @@ function showPage(page) {
     }
 
     // ==================== FIREBASE SYNC FUNCTIONS ====================
-    async function syncToCloud() {
-      if (!ensureEditable('sync data to cloud')) return;
+    async function syncToCloud(silent = false) {
+      if (!silent && !ensureEditable('sync data to cloud')) return;
       if (!firebaseInitialized) {
         // Try to initialize Firebase
         if (!initFirebase()) {
-          showAlert('Firebase not configured. Please update FIREBASE_CONFIG in the code with your actual Firebase credentials.', 'warning');
+          if (!silent) showAlert('Firebase not configured. Please update FIREBASE_CONFIG in the code with your actual Firebase credentials.', 'warning');
           return;
         }
       }
       
       try {
-        showAlert('Syncing data to cloud...', 'info');
+        if (!silent) showAlert('Syncing data to cloud...', 'info');
         
         const dataToSync = {
           users: appData.users,
@@ -6231,11 +6273,11 @@ function showPage(page) {
         };
         
         await firebaseDb.ref('rkGroupData').set(dataToSync);
-        showAlert('Data synced to cloud successfully!', 'success');
+        if (!silent) showAlert('Data synced to cloud successfully!', 'success');
         console.log('Data synced to Firebase at:', new Date().toISOString());
       } catch (error) {
         console.error('Sync to cloud error:', error);
-        showAlert('Failed to sync to cloud: ' + error.message, 'error');
+        if (!silent) showAlert('Failed to sync to cloud: ' + error.message, 'error');
       }
     }
 
@@ -6290,8 +6332,8 @@ function showPage(page) {
         // Debounce sync to avoid too many writes
         clearTimeout(window.syncTimeout);
         window.syncTimeout = setTimeout(() => {
-          syncToCloud().catch(err => console.error('Auto-sync error:', err));
-        }, 5000);
+          syncToCloud(true).catch(err => console.error('Auto-sync error:', err));
+        }, 800);
       }
     }
 
