@@ -2024,6 +2024,17 @@
                 </div>
               </div>
 
+              <div class="form-row">
+                <div class="form-field">
+                  <label>Pages User Can Open / View</label>
+                  <div id="userPageAccess" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff;"></div>
+                </div>
+                <div class="form-field">
+                  <label>Pages User Can Edit</label>
+                  <div id="userEditAccess" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff;"></div>
+                </div>
+              </div>
+
               <div id="superAdminWarning" class="alert alert-error hidden" style="margin-top: 14px;">
                 <i class="fas fa-exclamation-circle"></i> Only the primary super admin (sandipnandi2000@gmail.com) can create other super admin accounts.
               </div>
@@ -2049,6 +2060,8 @@
                     <th>Email/User ID</th>
                     <th>Role</th>
                     <th>Yard</th>
+                    <th>View Pages</th>
+                    <th>Edit Pages</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -2316,6 +2329,28 @@ console.log("✅ Connected to NEW Firebase");
       demo_viewer: ['dashboard', 'complaintDashboard', 'sales', 'complaints', 'cash', 'masters']
     };
 
+    const ROLE_EDIT_PERMISSIONS = {
+      super_admin: ['dashboard', 'complaintDashboard', 'sales', 'complaints', 'cash', 'masters', 'users', 'admin'],
+      admin: ['dashboard', 'complaintDashboard', 'sales', 'complaints', 'cash', 'masters', 'users'],
+      csd_entry: ['complaints'],
+      collecting_team: ['sales'],
+      cash_team: ['cash'],
+      ops_manager: [],
+      demo_viewer: []
+    };
+
+    const PAGE_ORDER = ['dashboard', 'complaintDashboard', 'sales', 'complaints', 'cash', 'masters', 'users', 'admin'];
+    const PAGE_LABELS = {
+      dashboard: 'Sales Dashboard',
+      complaintDashboard: 'Complaint Dashboard',
+      sales: 'Sales Entry',
+      complaints: 'Complaint Entry',
+      cash: 'Cash Deposit',
+      masters: 'Master Data',
+      users: 'User Management',
+      admin: 'Admin Panel'
+    };
+
     const ROLE_LABELS = {
       super_admin: 'Super Admin',
       admin: 'Admin',
@@ -2385,15 +2420,53 @@ console.log("✅ Connected to NEW Firebase");
         primarySuperAdmin.password = 'Sanju@1234';
         primarySuperAdmin.role = 'super_admin';
         primarySuperAdmin.yard = 'ALL';
+        primarySuperAdmin.pageAccess = [...PAGE_ORDER];
+        primarySuperAdmin.editAccess = [...PAGE_ORDER];
         primarySuperAdmin.active = true;
       } else {
-        appData.users.unshift({ id: 1, name: 'Super Admin', email: primaryEmail, password: 'Sanju@1234', role: 'super_admin', yard: 'ALL', active: true });
+        appData.users.unshift({ id: 1, name: 'Super Admin', email: primaryEmail, password: 'Sanju@1234', role: 'super_admin', yard: 'ALL', pageAccess: [...PAGE_ORDER], editAccess: [...PAGE_ORDER], active: true });
       }
       const hasDemo = appData.users.some(u => (u.email || '').toLowerCase() === 'demo');
       if (!hasDemo) {
-        appData.users.push({ id: Date.now(), name: 'Demo User', email: 'demo', password: 'Demo@1234', role: 'demo_viewer', yard: 'ALL', active: true });
+        appData.users.push({ id: Date.now(), name: 'Demo User', email: 'demo', password: 'Demo@1234', role: 'demo_viewer', yard: 'ALL', pageAccess: [...ROLE_PERMISSIONS.demo_viewer], editAccess: [], active: true });
       }
+      appData.users.forEach(user => {
+        if (!Array.isArray(user.pageAccess)) user.pageAccess = getDefaultPageAccess(user.role);
+        if (!Array.isArray(user.editAccess)) user.editAccess = getDefaultEditAccess(user.role);
+      });
       saveData();
+    }
+
+    function getDefaultPageAccess(role) {
+      return [...(ROLE_PERMISSIONS[role] || ['dashboard'])];
+    }
+
+    function getDefaultEditAccess(role) {
+      return [...(ROLE_EDIT_PERMISSIONS[role] || [])];
+    }
+
+    function getUserPageAccess(user = currentUser) {
+      if (!user) return [];
+      if (user.role === 'super_admin') return [...PAGE_ORDER];
+      return Array.isArray(user.pageAccess) ? user.pageAccess : getDefaultPageAccess(user.role);
+    }
+
+    function getUserEditAccess(user = currentUser) {
+      if (!user) return [];
+      if (user.role === 'super_admin') return [...PAGE_ORDER];
+      return Array.isArray(user.editAccess) ? user.editAccess : getDefaultEditAccess(user.role);
+    }
+
+    function hasPageAccess(page, user = currentUser) {
+      return getUserPageAccess(user).includes(page);
+    }
+
+    function hasEditAccess(page = getActivePage(), user = currentUser) {
+      return getUserEditAccess(user).includes(page);
+    }
+
+    function getActivePage() {
+      return document.querySelector('.nav-item.active')?.getAttribute('data-page') || 'dashboard';
     }
 
     function isReadOnlyUser() {
@@ -2403,6 +2476,10 @@ console.log("✅ Connected to NEW Firebase");
     function ensureEditable(actionLabel = 'perform this action') {
       if (isReadOnlyUser()) {
         showAlert(`Demo login is view-only. You cannot ${actionLabel}.`, 'warning');
+        return false;
+      }
+      if (currentUser && !hasEditAccess()) {
+        showAlert(`You have view-only access on this page. You cannot ${actionLabel}.`, 'warning');
         return false;
       }
       return true;
@@ -2518,11 +2595,56 @@ function showApp() {
   document.getElementById('appContainer').style.display = 'block';
 
   document.getElementById('userName').textContent = currentUser.name;
-  document.getElementById('userRoleDisplay').textContent = currentUser.role;
+  document.getElementById('userRoleDisplay').textContent = ROLE_LABELS[currentUser.role] || currentUser.role;
 
   setupNavigation();
   setupReadOnlyUi();
-  showPage('dashboard');
+  showPage(hasPageAccess('dashboard') ? 'dashboard' : getUserPageAccess()[0]);
+}
+
+function setupNavigation() {
+  const allowedPages = getUserPageAccess();
+  document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+    const page = item.getAttribute('data-page');
+    item.style.display = allowedPages.includes(page) ? 'flex' : 'none';
+  });
+}
+
+function setupReadOnlyUi() {
+  document.body.classList.toggle('readonly-user', getUserEditAccess().length === 0);
+}
+
+function showPage(page) {
+  if (!page || !hasPageAccess(page)) {
+    showAlert('You do not have access to this page.', 'error');
+    return;
+  }
+
+  document.querySelectorAll('.page-content').forEach(section => section.classList.add('hidden'));
+  const pageEl = document.getElementById(`page-${page}`);
+  if (!pageEl) {
+    showAlert('Page not found: ' + page, 'error');
+    return;
+  }
+  pageEl.classList.remove('hidden');
+
+  document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+    item.classList.toggle('active', item.getAttribute('data-page') === page);
+  });
+  document.getElementById('pageTitle').textContent = PAGE_LABELS[page] || page;
+
+  const loaders = {
+    dashboard: loadDashboard,
+    complaintDashboard: loadComplaintDashboard,
+    sales: loadSalesPage,
+    complaints: loadComplaintsPage,
+    cash: loadCashPage,
+    masters: loadMastersPage,
+    users: loadUsersPage,
+    admin: loadAdminPage
+  };
+  if (typeof loaders[page] === 'function') loaders[page]();
+  closeSidebar();
 }
 
     // ==================== DATE RANGE HELPERS ====================
@@ -5431,7 +5553,28 @@ function showApp() {
     // ==================== USERS PAGE FUNCTIONS ====================
     function loadUsersPage() {
       document.getElementById('userYard').innerHTML = '<option value="ALL">All Yards</option>' + (appData.yards || []).map(y => `<option value="${y}">${y}</option>`).join('');
+      renderUserAccessControls();
       loadUsersTable();
+    }
+
+    function renderUserAccessControls(pageAccess = null, editAccess = null) {
+      const role = document.getElementById('userRole')?.value || 'csd_entry';
+      const viewPages = pageAccess || getDefaultPageAccess(role);
+      const editPages = editAccess || getDefaultEditAccess(role);
+      const makeCheckbox = (type, page, checked) => `
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #334155;">
+          <input type="checkbox" class="${type}" value="${page}" ${checked ? 'checked' : ''}>
+          ${PAGE_LABELS[page]}
+        </label>
+      `;
+      const viewBox = document.getElementById('userPageAccess');
+      const editBox = document.getElementById('userEditAccess');
+      if (viewBox) viewBox.innerHTML = PAGE_ORDER.map(page => makeCheckbox('user-page-access', page, viewPages.includes(page))).join('');
+      if (editBox) editBox.innerHTML = PAGE_ORDER.map(page => makeCheckbox('user-edit-access', page, editPages.includes(page))).join('');
+    }
+
+    function getCheckedUserAccess(className) {
+      return [...document.querySelectorAll(`.${className}:checked`)].map(input => input.value);
     }
 
     function onRoleChange() {
@@ -5444,6 +5587,8 @@ function showApp() {
       } else {
         warning.classList.add('hidden');
       }
+      const selectedRole = document.getElementById('userRole').value;
+      renderUserAccessControls(getDefaultPageAccess(selectedRole), getDefaultEditAccess(selectedRole));
     }
 
     function saveUser() {
@@ -5454,11 +5599,19 @@ function showApp() {
       const confirmPassword = document.getElementById('userConfirmPassword').value;
       const role = document.getElementById('userRole').value;
       const yard = document.getElementById('userYard').value;
+      let pageAccess = getCheckedUserAccess('user-page-access');
+      let editAccess = getCheckedUserAccess('user-edit-access');
 
       if (!name || !email || !password) { showAlert('Please fill all required fields', 'error'); return; }
       if (password.length < 6) { showAlert('Password must be at least 6 characters', 'error'); return; }
       if (password !== confirmPassword) { showAlert('Passwords do not match', 'error'); return; }
       if (role === 'super_admin' && currentUser.email !== 'sandipnandi2000@gmail.com') { showAlert('Only the primary super admin can create super admin accounts', 'error'); return; }
+      if (role === 'super_admin') {
+        pageAccess = [...PAGE_ORDER];
+        editAccess = [...PAGE_ORDER];
+      }
+      if (!pageAccess.length) { showAlert('Select at least one page the user can open', 'error'); return; }
+      editAccess = editAccess.filter(page => pageAccess.includes(page));
 
       const existingIndex = appData.users.findIndex(u => u.email.toLowerCase() === email);
       
@@ -5469,6 +5622,8 @@ function showApp() {
         password: password,
         role: role,
         yard: yard,
+        pageAccess: pageAccess,
+        editAccess: editAccess,
         active: true
       };
 
@@ -5493,10 +5648,12 @@ function showApp() {
       document.getElementById('userRole').value = 'csd_entry';
       document.getElementById('userYard').value = 'ALL';
       document.getElementById('superAdminWarning').classList.add('hidden');
+      renderUserAccessControls(getDefaultPageAccess('csd_entry'), getDefaultEditAccess('csd_entry'));
     }
 
     function loadUsersTable() {
       const isAdmin = currentUser.role === 'admin';
+      const formatPages = pages => (pages || []).map(page => PAGE_LABELS[page] || page).join(', ') || '-';
       
       document.getElementById('usersTableBody').innerHTML = (appData.users || []).map(u => {
         if (isAdmin && u.role === 'super_admin' && u.email !== currentUser.email) {
@@ -5506,6 +5663,8 @@ function showApp() {
               <td><em>Hidden (Super Admin)</em></td>
               <td>${ROLE_LABELS[u.role] || u.role}</td>
               <td>${u.yard}</td>
+              <td>${formatPages(getUserPageAccess(u))}</td>
+              <td>${formatPages(getUserEditAccess(u))}</td>
               <td><span class="badge badge-${u.active ? 'success' : 'danger'}">${u.active ? 'Active' : 'Inactive'}</span></td>
               <td>-</td>
             </tr>
@@ -5518,6 +5677,8 @@ function showApp() {
             <td>${u.email}</td>
             <td>${ROLE_LABELS[u.role] || u.role}</td>
             <td>${u.yard}</td>
+            <td>${formatPages(getUserPageAccess(u))}</td>
+            <td>${formatPages(getUserEditAccess(u))}</td>
             <td><span class="badge badge-${u.active ? 'success' : 'danger'}">${u.active ? 'Active' : 'Inactive'}</span></td>
             <td>
               <button class="btn-icon edit" onclick="editUser(${u.id})"><i class="fas fa-edit"></i></button>
@@ -5538,8 +5699,8 @@ function showApp() {
       document.getElementById('userConfirmPassword').value = u.password;
       document.getElementById('userRole').value = u.role;
       document.getElementById('userYard').value = u.yard;
-      
-      onRoleChange();
+      renderUserAccessControls(getUserPageAccess(u), getUserEditAccess(u));
+      document.getElementById('superAdminWarning').classList.toggle('hidden', !(u.role === 'super_admin' && currentUser.email !== 'sandipnandi2000@gmail.com'));
     }
 
     function deleteUser(id) {
