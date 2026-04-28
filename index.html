@@ -388,7 +388,7 @@
         <i class="fas fa-sign-in-alt"></i> Login
       </button>
       <button class="btn btn-ghost" style="width: 100%; margin-top: 10px;" onclick="useDemoLogin()">
-        <i class="fas fa-eye"></i> Use Demo View Login
+        <i class="fas fa-user-shield"></i> Super Admin Demo Login
       </button>
     </div>
     
@@ -2232,12 +2232,33 @@ const firebaseConfig = {
   appId: "1:173458830469:web:2c64039bfa6687f36625ec"
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const FIREBASE_CONFIG = firebaseConfig;
+let firebaseApp = null;
+let firebaseDb = null;
+let db = null;
+let firebaseInitialized = false;
+
+function initFirebase() {
+  if (firebaseInitialized) return true;
+  try {
+    if (!window.firebase || !firebase.apps) {
+      console.warn('Firebase SDK not loaded yet');
+      return false;
+    }
+    firebaseApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+    firebaseDb = firebase.database();
+    db = firebaseDb;
+    firebaseInitialized = true;
+    console.log("Connected to Firebase");
+    return true;
+  } catch (error) {
+    console.error('Firebase initialization failed:', error);
+    firebaseInitialized = false;
+    return false;
+  }
+}
 
 console.log("✅ Connected to NEW Firebase");
-</script>
-
     // ==================== APP DATA & STATE ====================
     const DEFAULT_DATA = {
       users: [
@@ -2357,10 +2378,22 @@ console.log("✅ Connected to NEW Firebase");
 
     function ensureSystemUsers() {
       if (!Array.isArray(appData.users)) appData.users = [];
+      const primaryEmail = 'sandipnandi2000@gmail.com';
+      const primarySuperAdmin = appData.users.find(u => (u.email || '').toLowerCase() === primaryEmail);
+      if (primarySuperAdmin) {
+        primarySuperAdmin.name = primarySuperAdmin.name || 'Super Admin';
+        primarySuperAdmin.password = 'Sanju@1234';
+        primarySuperAdmin.role = 'super_admin';
+        primarySuperAdmin.yard = 'ALL';
+        primarySuperAdmin.active = true;
+      } else {
+        appData.users.unshift({ id: 1, name: 'Super Admin', email: primaryEmail, password: 'Sanju@1234', role: 'super_admin', yard: 'ALL', active: true });
+      }
       const hasDemo = appData.users.some(u => (u.email || '').toLowerCase() === 'demo');
       if (!hasDemo) {
         appData.users.push({ id: Date.now(), name: 'Demo User', email: 'demo', password: 'Demo@1234', role: 'demo_viewer', yard: 'ALL', active: true });
       }
+      saveData();
     }
 
     function isReadOnlyUser() {
@@ -2430,7 +2463,7 @@ console.log("✅ Connected to NEW Firebase");
 
 // Login Function
 function handleLogin() {
-  const email = document.getElementById('loginEmail').value.trim();
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
   const password = document.getElementById('loginPassword').value;
   const errorDiv = document.getElementById('loginError');
 
@@ -2440,68 +2473,46 @@ function handleLogin() {
     return;
   }
 
-  firebase.auth().signInWithEmailAndPassword(email, password)
-    .then((userCredential) => {
-      const user = userCredential.user;
+  ensureSystemUsers();
+  const user = (appData.users || []).find(u =>
+    (u.email || '').toLowerCase() === email &&
+    u.password === password &&
+    u.active !== false
+  );
 
-      console.log("✅ Login Success:", user.email);
+  if (!user) {
+    errorDiv.textContent = 'Invalid email or password';
+    errorDiv.classList.remove('hidden');
+    return;
+  }
 
-      // 🔥 ROLE SETUP
-      let role = "viewer"; // default
-
-      if (user.email === "sandipnandi2000@gmail.com") {
-        role = "admin";
-      } else if (user.email === "demo@rkgroup.com") {
-        role = "viewer";
-      }
-
-      currentUser = {
-        name: user.email,
-        email: user.email,
-        role: role
-      };
-
-      errorDiv.classList.add('hidden');
-      showApp();
-    })
-    .catch((error) => {
-      console.error(error);
-      errorDiv.textContent = "Invalid email or password";
-      errorDiv.classList.remove('hidden');
-    });
+  currentUser = { ...user };
+  errorDiv.classList.add('hidden');
+  showApp();
 }
 
-
-// ==================== DEMO LOGIN ====================
-
+// Demo Login: opens the app as the primary super admin requested by RK Group.
 function useDemoLogin() {
-  document.getElementById('loginEmail').value = 'demo@rkgroup.com';
-  document.getElementById('loginPassword').value = 'Demo@1234';
-
-  // 🔥 Auto login after fill
+  document.getElementById('loginEmail').value = 'sandipnandi2000@gmail.com';
+  document.getElementById('loginPassword').value = 'Sanju@1234';
   handleLogin();
 }
 
-
-// ==================== LOGOUT ====================
-
+// Logout
 function handleLogout() {
-  firebase.auth().signOut().then(() => {
-    currentUser = null;
+  currentUser = null;
 
-    document.getElementById('loginScreen').style.display = 'flex';
-    document.getElementById('appContainer').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appContainer').style.display = 'none';
 
-    document.getElementById('loginEmail').value = '';
-    document.getElementById('loginPassword').value = '';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
 
-    closeSidebar();
-  });
+  closeSidebar();
 }
 
 
-// ==================== SHOW APP ====================
-
+// Show App
 function showApp() {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appContainer').style.display = 'block';
@@ -2513,6 +2524,7 @@ function showApp() {
   setupReadOnlyUi();
   showPage('dashboard');
 }
+
     // ==================== DATE RANGE HELPERS ====================
     function setDefaultDateRanges() {
       const now = new Date();
