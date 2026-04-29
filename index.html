@@ -800,6 +800,43 @@
             </div>
           </div>
 
+          <div class="grid grid-2" style="margin-top: 16px;">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title">Top 10 Train Managers</h3>
+                  <p class="card-subtitle">Ranked by Sales %, GP %, and minimum complaints</p>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('trainManagerRankTable', 'top_train_managers')">
+                  <i class="fas fa-file-excel"></i>
+                </button>
+              </div>
+              <div class="table-container">
+                <table id="trainManagerRankTable">
+                  <thead><tr><th>Rank</th><th>Train Manager</th><th>Sales %</th><th>GP %</th><th>Complaints</th><th>Score</th></tr></thead>
+                  <tbody id="trainManagerRankTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title">Top 10 Rake Managers</h3>
+                  <p class="card-subtitle">Ranked by Sales %, GP %, and minimum complaints</p>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('rakeManagerRankTable', 'top_rake_managers')">
+                  <i class="fas fa-file-excel"></i>
+                </button>
+              </div>
+              <div class="table-container">
+                <table id="rakeManagerRankTable">
+                  <thead><tr><th>Rank</th><th>Rake Manager</th><th>Sales %</th><th>GP %</th><th>Complaints</th><th>Score</th></tr></thead>
+                  <tbody id="rakeManagerRankTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <!-- Train Rank Table -->
           <div class="card" style="margin-top: 16px;">
             <div class="card-header">
@@ -999,7 +1036,7 @@
               </div>
             </div>
             <div class="card" id="managerComplaintCard">
-              <h3 class="card-title">Manager-wise Complaint Contribution <small style="font-size: 10px; color: #64748b;">- Donut chart</small></h3>
+              <h3 class="card-title">Rake Manager-wise Complaint Contribution <small style="font-size: 10px; color: #64748b;">- Top 10 red marked</small></h3>
               <div class="chart-container">
                 <canvas id="managerComplaintChart"></canvas>
               </div>
@@ -1026,10 +1063,10 @@
           <div class="card" style="margin-top: 16px;">
             <div class="card-header">
               <div>
-                <h3 class="card-title">Top 10 Complaining Trains</h3>
-                <p class="card-subtitle">Trains with highest complaint counts in Period 1</p>
+                <h3 class="card-title">Rake Manager-wise Complaint Ranking</h3>
+                <p class="card-subtitle">Highest to lowest complaint count in Period 1. Top 10 are red marked.</p>
               </div>
-              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('topTrainsTable', 'top_complaining_trains')">
+              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('topTrainsTable', 'rake_manager_complaint_ranking')">
                 <i class="fas fa-file-excel"></i>
               </button>
             </div>
@@ -1295,7 +1332,7 @@
               <div class="form-row">
                 <div class="form-field">
                   <label>Complaint Date *</label>
-                  <input type="date" id="complaintDate" value="">
+                  <input type="date" id="complaintDate" value="" onchange="populateComplaintRakeManagers(document.getElementById('complaintTrainNo').value, document.getElementById('complaintTrainName').value, document.getElementById('complaintRakeManager').value); onComplaintRakeManagerChange();">
                 </div>
                 <div class="form-field">
                   <label>Complaint ID</label>
@@ -1342,6 +1379,31 @@
                 <div class="form-field">
                   <label>Yard</label>
                   <select id="complaintYard"></select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-field">
+                  <label>Rake Manager *</label>
+                  <select id="complaintRakeManager" onchange="onComplaintRakeManagerChange()">
+                    <option value="">Select train first</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label>Rake Number</label>
+                  <input type="text" id="complaintRakeNumber" readonly>
+                </div>
+                <div class="form-field">
+                  <label>Train Manager</label>
+                  <input type="text" id="complaintTrainManager" readonly>
+                </div>
+                <div class="form-field">
+                  <label>Business Head</label>
+                  <input type="text" id="complaintBusinessHead" readonly>
+                </div>
+                <div class="form-field">
+                  <label>VP</label>
+                  <input type="text" id="complaintVp" readonly>
                 </div>
               </div>
 
@@ -1812,11 +1874,18 @@
               </div>
               <div class="action-btns">
                 <button class="btn btn-ghost btn-sm" onclick="document.getElementById('masterImportFile').click()">
-                  <i class="fas fa-file-import"></i> Import
+                  <i class="fas fa-file-import"></i> Import Manager Master
                 </button>
                 <input type="file" id="masterImportFile" accept=".xlsx,.xls" style="display: none;" onchange="importMasterExcel(this)">
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('gpTargetImportFile').click()">
+                  <i class="fas fa-bullseye"></i> Import Sales & GP Target
+                </button>
+                <input type="file" id="gpTargetImportFile" accept=".xlsx,.xls" style="display: none;" onchange="importSalesGpTargetExcel(this)">
                 <button class="btn btn-ghost btn-sm" onclick="downloadMasterSample()">
-                  <i class="fas fa-download"></i> Sample
+                  <i class="fas fa-download"></i> Manager Sample
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="downloadGpTargetSample()">
+                  <i class="fas fa-download"></i> Target Sample
                 </button>
                 <button class="btn btn-ghost btn-sm" onclick="downloadMasterData()">
                   <i class="fas fa-file-export"></i> Export
@@ -1832,6 +1901,10 @@
               <div class="form-field">
                 <label>Train Number *</label>
                 <input type="text" id="masterTrainNumber" placeholder="Enter train number">
+              </div>
+              <div class="form-field">
+                <label>Rake Number *</label>
+                <input type="text" id="masterRakeNumber" placeholder="Example: Rake 1 / 22431A">
               </div>
               <div class="form-field">
                 <label>Yard *</label>
@@ -1862,6 +1935,14 @@
               <div class="form-field">
                 <label>Rake Manager</label>
                 <select id="masterRakeManager"></select>
+              </div>
+              <div class="form-field">
+                <label>Business Head</label>
+                <input type="text" id="masterBusinessHead" placeholder="Business head name">
+              </div>
+              <div class="form-field">
+                <label>VP</label>
+                <input type="text" id="masterVp" placeholder="VP name">
               </div>
             </div>
 
@@ -1944,10 +2025,15 @@
 
           <div class="card">
             <div class="card-header">
-              <h3 class="card-title">Train Master List</h3>
-              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('masterTable', 'train_master_list')">
-                <i class="fas fa-file-excel"></i>
-              </button>
+              <h3 class="card-title">Train Manager Master List</h3>
+              <div class="action-btns">
+                <button class="btn btn-danger btn-sm" onclick="deleteAllTrainMasters()">
+                  <i class="fas fa-trash"></i> Delete All
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('masterTable', 'train_master_list')">
+                  <i class="fas fa-file-excel"></i>
+                </button>
+              </div>
             </div>
             <div class="table-container">
               <table id="masterTable">
@@ -1955,11 +2041,14 @@
                   <tr>
                     <th>Train</th>
                     <th>Number</th>
+                    <th>Rake No</th>
                     <th>Yard</th>
                     <th>Type</th>
                     <th>Cluster</th>
                     <th>Manager</th>
                     <th>Rake Manager</th>
+                    <th>Business Head</th>
+                    <th>VP</th>
                     <th>Valid From</th>
                     <th>Valid To</th>
                     <th>Sales Target</th>
@@ -1968,6 +2057,36 @@
                   </tr>
                 </thead>
                 <tbody id="masterTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Sales and GP Target Master</h3>
+              <div class="action-btns">
+                <button class="btn btn-danger btn-sm" onclick="deleteAllTargetMasters()">
+                  <i class="fas fa-trash"></i> Delete All
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('targetMasterTable', 'sales_gp_target_master')">
+                  <i class="fas fa-file-excel"></i>
+                </button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table id="targetMasterTable">
+                <thead>
+                  <tr>
+                    <th>Train</th>
+                    <th>Number</th>
+                    <th>Valid From</th>
+                    <th>Valid To</th>
+                    <th>Valid Days</th>
+                    <th>Sales Target</th>
+                    <th>GP Target</th>
+                  </tr>
+                </thead>
+                <tbody id="targetMasterTableBody"></tbody>
               </table>
             </div>
           </div>
@@ -2111,26 +2230,26 @@
               <div style="padding: 14px; background: #fef2f2; border-radius: 10px; border: 1px solid #fca5a5;">
                 <h4 style="color: #dc2626; margin: 0 0 10px 0; font-size: 13px;">Reset Sales Data</h4>
                 <p style="font-size: 11px; color: #64748b; margin-bottom: 10px;">Delete all sales entries</p>
-                <button class="btn btn-danger btn-sm" style="width: 100%;" onclick="if(confirm('Delete ALL sales data? This cannot be undone!')) { appData.sales = []; saveData(); showAlert('All sales data deleted', 'success'); loadDashboard(); }">
+                <button class="btn btn-danger btn-sm" style="width: 100%;" onclick="deleteAllSalesData()">
                   <i class="fas fa-trash"></i> Delete All
                 </button>
               </div>
               <div style="padding: 14px; background: #fef2f2; border-radius: 10px; border: 1px solid #fca5a5;">
                 <h4 style="color: #dc2626; margin: 0 0 10px 0; font-size: 13px;">Reset Complaints</h4>
                 <p style="font-size: 11px; color: #64748b; margin-bottom: 10px;">Delete all complaint records</p>
-                <button class="btn btn-danger btn-sm" style="width: 100%;" onclick="if(confirm('Delete ALL complaint data? This cannot be undone!')) { appData.complaints = []; saveData(); showAlert('All complaint data deleted', 'success'); loadDashboard(); }">
+                <button class="btn btn-danger btn-sm" style="width: 100%;" onclick="deleteAllComplaintData()">
                   <i class="fas fa-trash"></i> Delete All
                 </button>
               </div>
               <div style="padding: 14px; background: #fef2f2; border-radius: 10px; border: 1px solid #fca5a5;">
                 <h4 style="color: #dc2626; margin: 0 0 10px 0; font-size: 13px;">Reset Cash Data</h4>
                 <p style="font-size: 11px; color: #64748b; margin-bottom: 10px;">Delete all cash deposit records</p>
-                <button class="btn btn-danger btn-sm" style="width: 100%;" onclick="if(confirm('Delete ALL cash deposit data? This cannot be undone!')) { appData.cash = []; saveData(); showAlert('All cash data deleted', 'success'); loadDashboard(); }">
+                <button class="btn btn-danger btn-sm" style="width: 100%;" onclick="deleteAllCashData()">
                   <i class="fas fa-trash"></i> Delete All
                 </button>
               </div>
               <div style="padding: 14px; background: #fef2f2; border-radius: 10px; border: 1px solid #fca5a5;">
-                <h4 style="color: #dc2626; margin: 0 0 10px 0; font-size: 13px;">Reset Everything</h4>
+                <h4 style="color: #dc2626; margin: 0 0 10px 0; font-size: 13px;">Reset Everything (Master Key)</h4>
                 <p style="font-size: 11px; color: #64748b; margin-bottom: 10px;">Reset to default data</p>
                 <button class="btn btn-danger btn-sm" style="width: 100%;" onclick="if(confirm('Reset ALL data to defaults? This cannot be undone!')) { resetToDefault(); }">
                   <i class="fas fa-redo"></i> Reset All
@@ -2285,6 +2404,7 @@ console.log("✅ Connected to NEW Firebase");
       trainManagerHierarchy: {},
       rakeManagerHierarchy: {},
       trainMasters: [],
+      targetMasters: [],
       sales: [],
       complaints: [],
       cash: []
@@ -2317,6 +2437,8 @@ console.log("✅ Connected to NEW Firebase");
     let chartFilter = { type: null, value: null };
     let compChartFilter = { type: null, value: null };
     let pendingSalesEntry = null;
+    const MASTER_DELETE_KEY = 'RKRESET2026';
+    const noDataPopupShown = { sales: false, complaints: false, cash: false };
 
     // Role permissions
     const ROLE_PERMISSIONS = {
@@ -2429,6 +2551,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!appData.trainManagerHierarchy) appData.trainManagerHierarchy = DEFAULT_DATA.trainManagerHierarchy;
       if (!appData.rakeManagerHierarchy) appData.rakeManagerHierarchy = DEFAULT_DATA.rakeManagerHierarchy;
       if (!appData.trainMasters) appData.trainMasters = DEFAULT_DATA.trainMasters;
+      if (!appData.targetMasters) appData.targetMasters = [];
       if (!appData.sales) appData.sales = DEFAULT_DATA.sales;
       if (!appData.complaints) appData.complaints = DEFAULT_DATA.complaints;
       if (!appData.cash) appData.cash = DEFAULT_DATA.cash;
@@ -2533,10 +2656,67 @@ console.log("✅ Connected to NEW Firebase");
     }
 
     function resetToDefault() {
+      if (!requireMasterDeleteKey('reset everything')) return;
       appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
       saveData();
       showAlert('Data reset to defaults', 'success');
       loadDashboard();
+    }
+
+    function requireMasterDeleteKey(actionLabel) {
+      const key = prompt(`Enter master key to ${actionLabel}:`);
+      if (key !== MASTER_DELETE_KEY) {
+        showAlert('Invalid master key. Delete/reset cancelled.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    function deleteAllSalesData() {
+      if (!ensureEditable('delete sales data') || !requireMasterDeleteKey('delete all sales data')) return;
+      if (!confirm('Delete ALL sales data? This cannot be undone!')) return;
+      appData.sales = [];
+      saveData();
+      showAlert('All sales data deleted', 'success');
+      loadDashboard();
+    }
+
+    function deleteAllComplaintData() {
+      if (!ensureEditable('delete complaint data') || !requireMasterDeleteKey('delete all complaint data')) return;
+      if (!confirm('Delete ALL complaint data? This cannot be undone!')) return;
+      appData.complaints = [];
+      saveData();
+      showAlert('All complaint data deleted', 'success');
+      loadDashboard();
+      loadComplaintDashboard();
+    }
+
+    function deleteAllCashData() {
+      if (!ensureEditable('delete cash data') || !requireMasterDeleteKey('delete all cash data')) return;
+      if (!confirm('Delete ALL cash deposit data? This cannot be undone!')) return;
+      appData.cash = [];
+      saveData();
+      showAlert('All cash data deleted', 'success');
+      loadDashboard();
+      loadCashDashboard();
+    }
+
+    function deleteAllTrainMasters() {
+      if (!ensureEditable('delete train manager master') || !requireMasterDeleteKey('delete all train manager master data')) return;
+      if (!confirm('Delete ALL train manager master data? Existing sales, complaints and cash entries will remain.')) return;
+      appData.trainMasters = [];
+      saveData();
+      showAlert('All train manager master data deleted', 'success');
+      loadMastersPage();
+    }
+
+    function deleteAllTargetMasters() {
+      if (!ensureEditable('delete target master') || !requireMasterDeleteKey('delete all sales and GP target master data')) return;
+      if (!confirm('Delete ALL sales and GP target master data? Existing transaction entries will remain.')) return;
+      appData.targetMasters = [];
+      saveData();
+      showAlert('All target master data deleted', 'success');
+      loadMastersPage();
     }
 
     function setupEventListeners() {
@@ -2557,10 +2737,15 @@ console.log("✅ Connected to NEW Firebase");
       document.getElementById('cashDate') && (document.getElementById('cashDate').value = today);
       document.getElementById('dashDateMode') && (document.getElementById('dashDateMode').value = 'single');
       document.getElementById('compDateMode') && (document.getElementById('compDateMode').value = 'single');
-      document.getElementById('dashSingleFromDate') && (document.getElementById('dashSingleFromDate').value = today);
-      document.getElementById('dashSingleToDate') && (document.getElementById('dashSingleToDate').value = today);
-      document.getElementById('compSingleFromDate') && (document.getElementById('compSingleFromDate').value = today);
-      document.getElementById('compSingleToDate') && (document.getElementById('compSingleToDate').value = today);
+      const salesLastDate = getLatestDataDate(appData.sales);
+      const complaintLastDate = getLatestDataDate(appData.complaints);
+      const cashLastDate = getLatestDataDate(appData.cash);
+      document.getElementById('dashSingleFromDate') && (document.getElementById('dashSingleFromDate').value = salesLastDate || today);
+      document.getElementById('dashSingleToDate') && (document.getElementById('dashSingleToDate').value = salesLastDate || today);
+      document.getElementById('compSingleFromDate') && (document.getElementById('compSingleFromDate').value = complaintLastDate || today);
+      document.getElementById('compSingleToDate') && (document.getElementById('compSingleToDate').value = complaintLastDate || today);
+      document.getElementById('cashDashFromDate') && (document.getElementById('cashDashFromDate').value = cashLastDate || today);
+      document.getElementById('cashDashToDate') && (document.getElementById('cashDashToDate').value = cashLastDate || today);
     }
 
     // ==================== MOBILE SIDEBAR ====================
@@ -3068,6 +3253,7 @@ function showPage(page) {
 
       // Render tables
       renderTopBottomTables(salesP1);
+      renderManagerRankingTables(salesP1, complaints);
       if (dateMode === 'comparison') {
         renderPeriodComparisonTable(salesP1, salesP2);
       } else {
@@ -3082,6 +3268,10 @@ function showPage(page) {
       // Update filter displays
       updateActiveFiltersDisplay();
       updateChartFilterDisplay();
+      if (!(appData.sales || []).length && !noDataPopupShown.sales) {
+        noDataPopupShown.sales = true;
+        showAlert('No sales data uploaded.', 'warning');
+      }
     }
 
     function updateActiveFiltersDisplay() {
@@ -3548,6 +3738,48 @@ function showPage(page) {
       `).join('');
     }
 
+    function renderManagerRankingTables(sales, complaints) {
+      const buildRows = (field) => {
+        const groups = {};
+        sales.forEach(s => {
+          const name = s[field] || 'Unassigned';
+          if (!groups[name]) groups[name] = { salesTarget: 0, salesAchievement: 0, gpTarget: 0, gpAchievement: 0, complaints: 0 };
+          groups[name].salesTarget += Number(s.salesTarget) || 0;
+          groups[name].salesAchievement += Number(s.salesAchievement) || 0;
+          groups[name].gpTarget += Number(s.gpTarget) || 0;
+          groups[name].gpAchievement += Number(s.gpAchievement) || 0;
+        });
+        complaints.forEach(c => {
+          const name = field === 'trainManager' ? (c.trainManager || getManagerFromTrainNumber(c.trainNo, c.trainName)) : getRakeManagerFromComplaint(c);
+          if (!groups[name]) groups[name] = { salesTarget: 0, salesAchievement: 0, gpTarget: 0, gpAchievement: 0, complaints: 0 };
+          groups[name].complaints++;
+        });
+        return Object.entries(groups).map(([name, data]) => {
+          const salesPct = data.salesTarget > 0 ? (data.salesAchievement / data.salesTarget) * 100 : 0;
+          const gpPct = data.gpTarget > 0 ? (data.gpAchievement / data.gpTarget) * 100 : 0;
+          const complaintScore = Math.max(0, 100 - (data.complaints * 10));
+          const score = (salesPct * 0.4) + (gpPct * 0.4) + (complaintScore * 0.2);
+          return { name, salesPct, gpPct, complaints: data.complaints, score };
+        }).sort((a, b) => b.score - a.score).slice(0, 10);
+      };
+      const render = (tbodyId, rows) => {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        tbody.innerHTML = rows.length ? rows.map((r, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${r.name}</td>
+            <td>${Math.round(r.salesPct)}%</td>
+            <td>${Math.round(r.gpPct)}%</td>
+            <td>${r.complaints}</td>
+            <td><strong>${r.score.toFixed(1)}</strong></td>
+          </tr>
+        `).join('') : '<tr><td colspan="6" style="text-align:center;color:#64748b;">No ranking data available.</td></tr>';
+      };
+      render('trainManagerRankTableBody', buildRows('trainManager'));
+      render('rakeManagerRankTableBody', buildRows('rakeManager'));
+    }
+
     function renderRankTable(sales, complaints, cash) {
       const trainMap = {};
       
@@ -3610,16 +3842,20 @@ function showPage(page) {
       return dateValue ? String(dateValue).slice(0, 10) : '';
     }
 
-    function getEffectiveMaster(trainNumber, trainName, dateValue) {
-      const day = getComparableDate(dateValue);
+    function getTrainMasterMatches(trainNumber, trainName) {
       const no5 = normalizeTrainNo(trainNumber);
       const nameKey = normalizeText(trainName);
-      const matched = (appData.trainMasters || []).filter(t => {
+      return (appData.trainMasters || []).filter(t => {
         const tNo5 = normalizeTrainNo(t.trainNumber);
         const numberMatch = no5 && tNo5 && no5 === tNo5;
         const nameMatch = !no5 && nameKey && normalizeText(t.trainName) === nameKey;
         return numberMatch || nameMatch;
       });
+    }
+
+    function getEffectiveMaster(trainNumber, trainName, dateValue, rakeManager = '', rakeNumber = '') {
+      const day = getComparableDate(dateValue);
+      const matched = getTrainMasterMatches(trainNumber, trainName);
 
       if (!matched.length) return null;
       const valid = matched.filter(t => {
@@ -3631,8 +3867,69 @@ function showPage(page) {
         return true;
       });
 
-      const pool = valid.length ? valid : matched;
+      let pool = valid.length ? valid : matched;
+      const rakeKey = normalizeText(rakeManager);
+      const rakeNoKey = normalizeText(rakeNumber);
+      const rakeMatched = pool.filter(t => {
+        const managerMatch = rakeKey && normalizeText(t.rakeManager) === rakeKey;
+        const numberMatch = rakeNoKey && normalizeText(t.rakeNumber) === rakeNoKey;
+        return managerMatch || numberMatch;
+      });
+      if (rakeMatched.length) pool = rakeMatched;
       return pool.sort((a, b) => (b.validFrom || '').localeCompare(a.validFrom || ''))[0];
+    }
+
+    function getEffectiveTarget(trainNumber, trainName, dateValue) {
+      const day = getComparableDate(dateValue);
+      const key = buildTrainKey(trainNumber, trainName);
+      const matched = (appData.targetMasters || []).filter(t => buildTrainKey(t.trainNumber, t.trainName) === key);
+      const valid = matched.filter(t => {
+        if (!day) return true;
+        if (t.validFrom && day < t.validFrom) return false;
+        if (t.validTo && day > t.validTo) return false;
+        return true;
+      });
+      return (valid.length ? valid : matched).sort((a, b) => (b.validFrom || '').localeCompare(a.validFrom || ''))[0] || null;
+    }
+
+    function getTrainSalesTarget(trainNumber, trainName, dateValue) {
+      const target = getEffectiveTarget(trainNumber, trainName, dateValue);
+      if (target && Number(target.salesTarget)) return Math.round(Number(target.salesTarget) || 0);
+      const effective = getEffectiveMaster(trainNumber, trainName, dateValue);
+      return Math.round(Number(effective?.salesTarget) || 0);
+    }
+
+    function getTrainGpTarget(trainNumber, trainName, dateValue) {
+      const target = getEffectiveTarget(trainNumber, trainName, dateValue);
+      if (target && Number(target.gpTarget)) return Math.round(Number(target.gpTarget) || 0);
+      const effective = getEffectiveMaster(trainNumber, trainName, dateValue);
+      if (effective && Number(effective.gpTarget)) return Math.round(Number(effective.gpTarget) || 0);
+      const match = getTrainMasterMatches(trainNumber, trainName).find(t => Number(t.gpTarget));
+      return Math.round(Number(match?.gpTarget) || 0);
+    }
+
+    function applyGpTargetToTrain(trainNumber, trainName, gpTarget) {
+      const matches = getTrainMasterMatches(trainNumber, trainName);
+      matches.forEach(t => { t.gpTarget = Math.round(Number(gpTarget) || 0); });
+    }
+
+    function getRakeOptionsForTrain(trainNumber, trainName, dateValue) {
+      const day = getComparableDate(dateValue);
+      return getTrainMasterMatches(trainNumber, trainName)
+        .filter(t => {
+          if (!day) return true;
+          if (t.validFrom && day < t.validFrom) return false;
+          if (t.validTo && day > t.validTo) return false;
+          return true;
+        })
+        .filter(t => t.rakeManager || t.rakeNumber)
+        .sort((a, b) => String(a.rakeManager || '').localeCompare(String(b.rakeManager || '')));
+    }
+
+    function getRakeManagerFromComplaint(c) {
+      if (c.rakeManager) return c.rakeManager;
+      const effective = getEffectiveMaster(c.trainNo, c.trainName, c.date, c.rakeManager, c.rakeNumber);
+      return effective?.rakeManager || 'Unassigned';
     }
 
     function refreshSalesTargetForDate() {
@@ -3641,9 +3938,9 @@ function showPage(page) {
       if (!trainId || !saleDate) return;
       const selected = (appData.trainMasters || []).find(t => t.id == trainId);
       if (!selected) return;
-      const effective = getEffectiveMaster(selected.trainNumber, selected.trainName, saleDate) || selected;
-      document.getElementById('salesTarget').value = Math.round(Number(effective.salesTarget) || 0);
-      document.getElementById('salesGpTarget').value = Math.round(Number(effective.gpTarget) || 0);
+      const effective = getEffectiveMaster(selected.trainNumber, selected.trainName, saleDate, selected.rakeManager, selected.rakeNumber) || selected;
+      document.getElementById('salesTarget').value = getTrainSalesTarget(selected.trainNumber, selected.trainName, saleDate);
+      document.getElementById('salesGpTarget').value = getTrainGpTarget(selected.trainNumber, selected.trainName, saleDate);
       document.getElementById('salesClusterManager').value = effective.clusterManager || '';
       document.getElementById('salesTrainManager').value = effective.trainManager || '';
       document.getElementById('salesRakeManager').value = effective.rakeManager || '';
@@ -3713,8 +4010,8 @@ function showPage(page) {
       const complaintsP1 = getFilteredComplaints(1); // Current/Period 1
       const complaintsP2 = getFilteredComplaints(2); // Previous/Period 2
       
-      // Variance = P2 - P1
-      const variance = complaintsP2.length - complaintsP1.length;
+      // Variance = P1 - P2. Positive means recent/current complaints increased, which is bad.
+      const variance = complaintsP1.length - complaintsP2.length;
 
       // Get date ranges for display
       const fromDate1 = dateMode === 'single' ? document.getElementById('compSingleFromDate')?.value : document.getElementById('compFromDate1')?.value;
@@ -3760,6 +4057,10 @@ function showPage(page) {
       
       renderComplaintComparisonTables(complaintsP1, complaintsP2);
       updateCompChartFilterDisplay();
+      if (!(appData.complaints || []).length && !noDataPopupShown.complaints) {
+        noDataPopupShown.complaints = true;
+        showAlert('No complaint data uploaded.', 'warning');
+      }
     }
 
     function updateCompChartFilterDisplay() {
@@ -3960,17 +4261,16 @@ function showPage(page) {
       const ctx = document.getElementById('managerComplaintChart');
       if (!ctx) return;
 
-      // Build manager complaint map using train number (first 5 digits) and train name
       const managerMap = {};
       
       current.forEach(c => {
-        const manager = getManagerFromTrainNumber(c.trainNo, c.trainName);
+        const manager = getRakeManagerFromComplaint(c);
         if (!managerMap[manager]) managerMap[manager] = { current: 0, prev: 0 };
         managerMap[manager].current++;
       });
 
       prev.forEach(c => {
-        const manager = getManagerFromTrainNumber(c.trainNo, c.trainName);
+        const manager = getRakeManagerFromComplaint(c);
         if (!managerMap[manager]) managerMap[manager] = { current: 0, prev: 0 };
         managerMap[manager].prev++;
       });
@@ -3981,11 +4281,12 @@ function showPage(page) {
       if (hasRealManagers) {
         managers = managers.filter(m => m !== 'Unassigned');
       }
+      managers.sort((a, b) => managerMap[b].current - managerMap[a].current);
       
       const totalCurrent = current.length || 1;
       
-      // Colors for donut chart
-      const colors = ['#0ea5e9', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#84cc16'];
+      // Red only when current complaints are higher than the previous comparison period.
+      const colors = managers.map((m, i) => managerMap[m].current > managerMap[m].prev ? '#ef4444' : ['#0ea5e9', '#f59e0b', '#22c55e', '#8b5cf6', '#06b6d4', '#ec4899'][i % 6]);
 
       if (charts.managerComplaint) charts.managerComplaint.destroy();
       charts.managerComplaint = new Chart(ctx, {
@@ -4276,35 +4577,68 @@ function showPage(page) {
       const tbody = document.getElementById('topTrainsTableBody');
       if (!tbody) return;
 
-      // Count complaints by train for Period 1 (current)
-      const trainMap = {};
-      current.forEach(c => {
-        if (!trainMap[c.trainName]) {
-          trainMap[c.trainName] = { 
-            total: 0, 
-            open: 0, 
-            closed: 0, 
+      const table = document.getElementById('topTrainsTable');
+      if (table) {
+        const headerRow = table.querySelector('thead tr');
+        if (headerRow) {
+          headerRow.innerHTML = `
+            <th>Rank</th>
+            <th>Rake Manager</th>
+            <th>Linked Trains</th>
+            <th>Current</th>
+            <th>Previous</th>
+            <th>Increase</th>
+            <th>Open</th>
+            <th>Closed</th>
+          `;
+        }
+      }
+
+      const managerMap = {};
+      prev.forEach(c => {
+        const manager = getRakeManagerFromComplaint(c);
+        if (!managerMap[manager]) {
+          managerMap[manager] = {
+            total: 0,
+            previous: 0,
+            open: 0,
+            closed: 0,
             inProgress: 0,
-            manager: getManagerFromTrainNumber(c.trainNo, c.trainName)
+            trains: new Set()
           };
         }
-        trainMap[c.trainName].total++;
-        if (c.status === 'Open') trainMap[c.trainName].open++;
-        else if (c.status === 'Closed') trainMap[c.trainName].closed++;
-        else if (c.status === 'In Progress') trainMap[c.trainName].inProgress++;
+        managerMap[manager].previous++;
+      });
+      current.forEach(c => {
+        const manager = getRakeManagerFromComplaint(c);
+        if (!managerMap[manager]) {
+          managerMap[manager] = {
+            total: 0,
+            previous: 0,
+            open: 0,
+            closed: 0,
+            inProgress: 0,
+            trains: new Set()
+          };
+        }
+        managerMap[manager].total++;
+        if (c.trainName) managerMap[manager].trains.add(c.trainName);
+        if (c.status === 'Open') managerMap[manager].open++;
+        else if (c.status === 'Closed') managerMap[manager].closed++;
+        else if (c.status === 'In Progress') managerMap[manager].inProgress++;
       });
 
-      // Sort by total complaints (descending) and take top 10
-      const sortedTrains = Object.entries(trainMap)
-        .sort((a, b) => b[1].total - a[1].total)
-        .slice(0, 10);
+      const sortedManagers = Object.entries(managerMap)
+        .sort((a, b) => b[1].total - a[1].total);
 
-      tbody.innerHTML = sortedTrains.map(([name, data], index) => `
-        <tr class="${data.total >= 5 ? 'high-complaint' : ''}" style="cursor:pointer;" onclick="applyComplaintFilter('train','${encodeURIComponent(name)}')">
+      tbody.innerHTML = sortedManagers.map(([name, data], index) => `
+        <tr class="${data.total > data.previous ? 'high-complaint' : ''}">
           <td>${index + 1}</td>
           <td>${name}</td>
-          <td>${data.manager}</td>
+          <td>${[...data.trains].slice(0, 5).join(', ') || '-'}</td>
           <td><strong>${data.total}</strong></td>
+          <td>${data.previous}</td>
+          <td class="${data.total > data.previous ? 'complaint-variance-positive' : 'complaint-variance-neutral'}">${data.total - data.previous > 0 ? '+' : ''}${data.total - data.previous}</td>
           <td><span class="badge badge-danger">${data.open}</span></td>
           <td><span class="badge badge-success">${data.closed}</span></td>
         </tr>
@@ -4334,7 +4668,7 @@ function showPage(page) {
             <th>Train Name</th>
             <th>${p1Label}</th>
             <th>${p2Label}</th>
-            <th>Difference (P2-P1)</th>
+            <th>Increase (P1-P2)</th>
           `;
         }
       }
@@ -4347,7 +4681,7 @@ function showPage(page) {
             <th>Complaint Nature</th>
             <th>${p1Label}</th>
             <th>${p2Label}</th>
-            <th>Difference (P2-P1)</th>
+            <th>Increase (P1-P2)</th>
           `;
         }
       }
@@ -4371,14 +4705,14 @@ function showPage(page) {
           name, 
           current: data.current, 
           prev: data.prev, 
-          diff: data.prev - data.current  // P2 - P1
+          diff: data.current - data.prev  // P1 - P2; positive is a warning
         }))
         .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
       
       // Calculate totals
       const totalCurrent = trainRows.reduce((sum, r) => sum + r.current, 0);
       const totalPrev = trainRows.reduce((sum, r) => sum + r.prev, 0);
-      const totalDiff = totalPrev - totalCurrent;
+      const totalDiff = totalCurrent - totalPrev;
 
       document.getElementById('compTrainTableBody').innerHTML = 
         // Total row first
@@ -4423,14 +4757,14 @@ function showPage(page) {
         .map(([name, data]) => ({ 
           name, 
           ...data, 
-          diff: data.prev - data.current  // P2 - P1
+          diff: data.current - data.prev  // P1 - P2; positive is a warning
         }))
         .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
       
       // Calculate totals
       const natureTotalCurrent = natureRows.reduce((sum, r) => sum + r.current, 0);
       const natureTotalPrev = natureRows.reduce((sum, r) => sum + r.prev, 0);
-      const natureTotalDiff = natureTotalPrev - natureTotalCurrent;
+      const natureTotalDiff = natureTotalCurrent - natureTotalPrev;
 
       document.getElementById('compNatureTableBody').innerHTML = 
         // Total row first
@@ -4513,6 +4847,10 @@ function showPage(page) {
       }
 
       renderManagerCashTable(cashData, salesData);
+      if (!(appData.cash || []).length && !noDataPopupShown.cash) {
+        noDataPopupShown.cash = true;
+        showAlert('No cash deposit data uploaded.', 'warning');
+      }
     }
 
     function renderManagerCashTable(cashData, salesData) {
@@ -4635,7 +4973,7 @@ function showPage(page) {
       const dropdown = document.getElementById('trainDropdown');
       dropdown.innerHTML = trains.map(t => `
         <div class="searchable-dropdown-item" onclick="selectTrain('${t.id}', '${t.trainName}', '${t.trainNumber}')">
-          ${t.trainName} (${t.trainNumber})
+          ${t.trainName} (${t.trainNumber})${t.rakeNumber ? ' - ' + t.rakeNumber : ''}
         </div>
       `).join('');
     }
@@ -4687,7 +5025,7 @@ function showPage(page) {
         document.getElementById('salesRakeManager').value = train.rakeManager || '';
         document.getElementById('salesTrainType').value = train.trainType || '';
         document.getElementById('salesTarget').value = Math.round(Number(train.salesTarget) || 0);
-        document.getElementById('salesGpTarget').value = Math.round(Number(train.gpTarget) || 0);
+        document.getElementById('salesGpTarget').value = getTrainGpTarget(train.trainNumber, train.trainName, document.getElementById('salesDate')?.value);
         refreshSalesTargetForDate();
       }
     }
@@ -4779,7 +5117,9 @@ function showPage(page) {
 
       const train = appData.trainMasters.find(t => t.id == trainId);
       if (!train) { showAlert('Train not found', 'error'); return; }
-      const effectiveTrain = getEffectiveMaster(train.trainNumber, train.trainName, date) || train;
+      const effectiveTrain = getEffectiveMaster(train.trainNumber, train.trainName, date, train.rakeManager, train.rakeNumber) || train;
+      const duplicate = findDuplicateEntry(appData.sales, date, train.trainNumber, train.trainName, editingId);
+      if (duplicate && !confirm('Sales data is already available for same train number and date. Overwrite existing entry?')) return;
 
       const entry = {
         id: editingId || Date.now(),
@@ -4792,10 +5132,13 @@ function showPage(page) {
         clusterManager: effectiveTrain.clusterManager || '',
         trainManager: effectiveTrain.trainManager || '',
         rakeManager: effectiveTrain.rakeManager || '',
+        rakeNumber: effectiveTrain.rakeNumber || '',
+        businessHead: effectiveTrain.businessHead || '',
+        vp: effectiveTrain.vp || '',
         trainType: effectiveTrain.trainType || train.trainType,
-        salesTarget: Math.round(Number(effectiveTrain.salesTarget) || 0),
+        salesTarget: getTrainSalesTarget(train.trainNumber, train.trainName, date),
         salesAchievement: Math.round(Number(salesAchievement)),
-        gpTarget: Math.round(Number(effectiveTrain.gpTarget) || 0),
+        gpTarget: getTrainGpTarget(train.trainNumber, train.trainName, date),
         gpAchievement: Math.round(Number(gpAchievement)),
         remarks: document.getElementById('salesRemarks').value
       };
@@ -4803,6 +5146,9 @@ function showPage(page) {
       if (editingId && editingType === 'sales') {
         const index = appData.sales.findIndex(s => s.id == editingId);
         if (index >= 0) appData.sales[index] = entry;
+      } else if (duplicate) {
+        const index = appData.sales.findIndex(s => s.id == duplicate.id);
+        if (index >= 0) appData.sales[index] = { ...entry, id: duplicate.id };
       } else {
         appData.sales.push(entry);
       }
@@ -4935,7 +5281,7 @@ function showPage(page) {
       const dropdown = document.getElementById('complaintTrainDropdown');
       dropdown.innerHTML = trains.map(t => `
         <div class="searchable-dropdown-item" onclick="selectComplaintTrain('${t.id}', '${t.trainName}', '${t.trainNumber}', '${t.trainType || ''}', '${t.yard || ''}')">
-          ${t.trainName} (${t.trainNumber})
+          ${t.trainName} (${t.trainNumber})${t.rakeNumber ? ' - ' + t.rakeNumber : ''}
         </div>
       `).join('');
     }
@@ -4954,6 +5300,43 @@ function showPage(page) {
       document.getElementById('complaintTrainNo').value = normalizeTrainNo(number) || number || '';
       document.getElementById('complaintTrainType').value = type;
       if (yard) document.getElementById('complaintYard').value = yard;
+      populateComplaintRakeManagers(number, name);
+      onComplaintRakeManagerChange();
+    }
+
+    function populateComplaintRakeManagers(trainNumber, trainName, selectedRakeManager = '') {
+      const select = document.getElementById('complaintRakeManager');
+      if (!select) return;
+      const date = document.getElementById('complaintDate')?.value || '';
+      const options = getRakeOptionsForTrain(trainNumber, trainName, date);
+      if (!options.length) {
+        select.innerHTML = '<option value="">No rake manager found in master</option>';
+        document.getElementById('complaintRakeNumber').value = '';
+        document.getElementById('complaintTrainManager').value = '';
+        document.getElementById('complaintBusinessHead').value = '';
+        document.getElementById('complaintVp').value = '';
+        return;
+      }
+      select.innerHTML = '<option value="">Select Rake Manager</option>' + options.map(t => {
+        const label = `${t.rakeManager || 'Unassigned'}${t.rakeNumber ? ' - ' + t.rakeNumber : ''}`;
+        return `<option value="${t.rakeManager || ''}" data-rake-number="${t.rakeNumber || ''}">${label}</option>`;
+      }).join('');
+      if (selectedRakeManager) select.value = selectedRakeManager;
+      if (!select.value && options.length === 1) select.value = options[0].rakeManager || '';
+    }
+
+    function onComplaintRakeManagerChange() {
+      const trainNo = document.getElementById('complaintTrainNo')?.value || '';
+      const trainName = document.getElementById('complaintTrainName')?.value || '';
+      const rakeManager = document.getElementById('complaintRakeManager')?.value || '';
+      const rakeNumber = document.getElementById('complaintRakeManager')?.selectedOptions?.[0]?.dataset?.rakeNumber || '';
+      const effective = getEffectiveMaster(trainNo, trainName, document.getElementById('complaintDate')?.value, rakeManager, rakeNumber);
+      document.getElementById('complaintRakeNumber').value = effective?.rakeNumber || rakeNumber || '';
+      document.getElementById('complaintTrainManager').value = effective?.trainManager || '';
+      document.getElementById('complaintBusinessHead').value = effective?.businessHead || '';
+      document.getElementById('complaintVp').value = effective?.vp || '';
+      if (effective?.yard) document.getElementById('complaintYard').value = effective.yard;
+      if (effective?.trainType) document.getElementById('complaintTrainType').value = effective.trainType;
     }
 
     function switchComplaintTab(tab) {
@@ -4969,10 +5352,16 @@ function showPage(page) {
       const date = document.getElementById('complaintDate').value;
       const trainName = document.getElementById('complaintTrainName').value;
       const nature = document.getElementById('complaintNature').value;
+      const rakeManager = document.getElementById('complaintRakeManager').value;
 
-      if (!date || !trainName || !nature) { showAlert('Please fill all required fields', 'error'); return; }
+      if (!date || !trainName || !rakeManager || !nature) { showAlert('Please fill all required fields including Rake Manager', 'error'); return; }
 
       const isEdit = editingId && editingType === 'complaint';
+      const trainNoForComplaint = document.getElementById('complaintTrainNo').value;
+      const effective = getEffectiveMaster(trainNoForComplaint, trainName, date, rakeManager, document.getElementById('complaintRakeNumber').value);
+      if (!effective) { showAlert('Complaint train must be listed in Train Manager Master.', 'error'); return; }
+      const duplicate = findDuplicateEntry(appData.complaints, date, trainNoForComplaint, trainName, editingId);
+      if (duplicate && !confirm('Complaint data is already available for same train number and date. Overwrite existing entry?')) return;
       const complaint = {
         id: editingId || Date.now(),
         date: date,
@@ -4983,6 +5372,11 @@ function showPage(page) {
         trainName: trainName,
         trainType: document.getElementById('complaintTrainType').value,
         yard: document.getElementById('complaintYard').value,
+        rakeManager: rakeManager,
+        rakeNumber: document.getElementById('complaintRakeNumber').value || effective?.rakeNumber || '',
+        trainManager: document.getElementById('complaintTrainManager').value || effective?.trainManager || '',
+        businessHead: document.getElementById('complaintBusinessHead').value || effective?.businessHead || '',
+        vp: document.getElementById('complaintVp').value || effective?.vp || '',
         complainantName: document.getElementById('complaintName').value,
         mobileNo: document.getElementById('complaintMobile').value,
         pnrNo: document.getElementById('complaintPnr').value,
@@ -4995,6 +5389,9 @@ function showPage(page) {
       if (editingId && editingType === 'complaint') {
         const index = appData.complaints.findIndex(c => c.id == editingId);
         if (index >= 0) appData.complaints[index] = complaint;
+      } else if (duplicate) {
+        const index = appData.complaints.findIndex(c => c.id == duplicate.id);
+        if (index >= 0) appData.complaints[index] = { ...complaint, id: duplicate.id };
       } else {
         appData.complaints.push(complaint);
       }
@@ -5019,6 +5416,11 @@ function showPage(page) {
       document.getElementById('complaintTrainSearch').value = '';
       document.getElementById('complaintTrainType').value = '';
       document.getElementById('complaintYard').value = appData.yards[0] || '';
+      document.getElementById('complaintRakeManager').innerHTML = '<option value="">Select train first</option>';
+      document.getElementById('complaintRakeNumber').value = '';
+      document.getElementById('complaintTrainManager').value = '';
+      document.getElementById('complaintBusinessHead').value = '';
+      document.getElementById('complaintVp').value = '';
       document.getElementById('complaintName').value = '';
       document.getElementById('complaintMobile').value = '';
       document.getElementById('complaintPnr').value = '';
@@ -5105,6 +5507,12 @@ function showPage(page) {
       document.getElementById('complaintTrainSearch').value = c.trainName;
       document.getElementById('complaintTrainType').value = c.trainType || '';
       document.getElementById('complaintYard').value = c.yard;
+      populateComplaintRakeManagers(c.trainNo, c.trainName, c.rakeManager || '');
+      document.getElementById('complaintRakeManager').value = c.rakeManager || '';
+      document.getElementById('complaintRakeNumber').value = c.rakeNumber || '';
+      document.getElementById('complaintTrainManager').value = c.trainManager || '';
+      document.getElementById('complaintBusinessHead').value = c.businessHead || '';
+      document.getElementById('complaintVp').value = c.vp || '';
       document.getElementById('complaintName').value = c.complainantName || '';
       document.getElementById('complaintMobile').value = c.mobileNo || '';
       document.getElementById('complaintPnr').value = c.pnrNo || '';
@@ -5136,7 +5544,7 @@ function showPage(page) {
       const trains = appData.trainMasters || [];
       dropdown.innerHTML = trains.map(t => `
         <div class="searchable-dropdown-item" onclick="selectCashTrain('${t.id}', '${t.trainName}', '${t.trainNumber}')">
-          ${t.trainName} (${t.trainNumber})
+          ${t.trainName} (${t.trainNumber})${t.rakeNumber ? ' - ' + t.rakeNumber : ''}
         </div>
       `).join('');
 
@@ -5167,7 +5575,8 @@ function showPage(page) {
       document.getElementById('cashTrainNo').value = normalizeTrainNo(number) || number || '';
       document.getElementById('cashTrainDropdown').classList.remove('active');
       const date = document.getElementById('cashDate').value;
-      const effective = getEffectiveMaster(number, name, date);
+      const selected = (appData.trainMasters || []).find(t => t.id == id);
+      const effective = getEffectiveMaster(number, name, date, selected?.rakeManager, selected?.rakeNumber) || selected;
       document.getElementById('cashTrainManager').value = effective?.trainManager || '';
       document.getElementById('cashRakeManager').value = effective?.rakeManager || '';
       updateCashGPFromSales();
@@ -5198,7 +5607,9 @@ function showPage(page) {
 
       const trainId = document.getElementById('cashTrainId').value;
       const train = trainId ? appData.trainMasters.find(t => t.id == trainId) : null;
-      const effective = train ? (getEffectiveMaster(train.trainNumber, train.trainName, date) || train) : null;
+      const effective = train ? (getEffectiveMaster(train.trainNumber, train.trainName, date, train.rakeManager, train.rakeNumber) || train) : null;
+      const duplicate = train ? findDuplicateEntry(appData.cash, date, train.trainNumber, train.trainName, editingId) : null;
+      if (duplicate && !confirm('Cash deposit data is already available for same train number and date. Overwrite existing entry?')) return;
 
       const entry = {
         id: editingId || Date.now(),
@@ -5209,6 +5620,9 @@ function showPage(page) {
         trainNumber: train ? (normalizeTrainNo(train.trainNumber) || train.trainNumber || '') : '',
         trainManager: effective?.trainManager || '',
         rakeManager: effective?.rakeManager || '',
+        rakeNumber: effective?.rakeNumber || '',
+        businessHead: effective?.businessHead || '',
+        vp: effective?.vp || '',
         gpFromSales: gpFromSales,
         gpCollected: Number(document.getElementById('cashGpCollected')?.value) || 0,
         cashDepositCounter: cashDeposit,
@@ -5221,6 +5635,9 @@ function showPage(page) {
       if (editingId && editingType === 'cash') {
         const index = appData.cash.findIndex(c => c.id == editingId);
         if (index >= 0) appData.cash[index] = entry;
+      } else if (duplicate) {
+        const index = appData.cash.findIndex(c => c.id == duplicate.id);
+        if (index >= 0) appData.cash[index] = { ...entry, id: duplicate.id };
       } else {
         appData.cash.push(entry);
       }
@@ -5344,6 +5761,7 @@ function showPage(page) {
       onMasterTrainManagerChange();
       
       updateMasterTargetDisplay();
+      loadTargetMasterTable();
       
       const hasData = appData.trainMasters && appData.trainMasters.length > 0;
       document.getElementById('noMasterDataWarning').classList.toggle('hidden', hasData);
@@ -5356,8 +5774,9 @@ function showPage(page) {
       const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
       document.getElementById('currentMonthName').textContent = monthNames[now.getMonth()] + ' ' + now.getFullYear();
       
-      const totalSalesTarget = appData.trainMasters.reduce((sum, t) => sum + (Number(t.salesTarget) || 0), 0);
-      const totalGpTarget = appData.trainMasters.reduce((sum, t) => sum + (Number(t.gpTarget) || 0), 0);
+      const targetRows = (appData.targetMasters || []).length ? appData.targetMasters : appData.trainMasters;
+      const totalSalesTarget = targetRows.reduce((sum, t) => sum + (Number(t.salesTarget) || 0), 0);
+      const totalGpTarget = targetRows.reduce((sum, t) => sum + (Number(t.gpTarget) || 0), 0);
       
       document.getElementById('totalSalesTarget').textContent = formatCurrency(totalSalesTarget);
       document.getElementById('totalGpTarget').textContent = formatCurrency(totalGpTarget);
@@ -5398,15 +5817,18 @@ function showPage(page) {
       if (!ensureEditable('save master data')) return;
       const name = document.getElementById('masterTrainName').value.trim();
       const number = normalizeTrainNo(document.getElementById('masterTrainNumber').value.trim());
+      const rakeNumber = document.getElementById('masterRakeNumber').value.trim();
       const yard = document.getElementById('masterYard').value;
       const clusterManager = document.getElementById('masterClusterManager').value;
       const trainManager = document.getElementById('masterTrainManager').value;
       const rakeManager = document.getElementById('masterRakeManager').value;
+      const businessHead = document.getElementById('masterBusinessHead').value.trim();
+      const vp = document.getElementById('masterVp').value.trim();
       const validFrom = document.getElementById('masterValidFrom').value;
       let validTo = document.getElementById('masterValidTo').value;
       const validDays = Number(document.getElementById('masterValidDays').value) || 0;
 
-      if (!name || !number || !yard || !validFrom) { showAlert('Please fill all required fields including validity start date', 'error'); return; }
+      if (!name || !number || !rakeNumber || !yard || !validFrom) { showAlert('Please fill all required fields including rake number and validity start date', 'error'); return; }
       if (!validTo && validDays > 0) {
         const d = new Date(validFrom);
         d.setDate(d.getDate() + validDays - 1);
@@ -5428,11 +5850,14 @@ function showPage(page) {
         id: editingId || Date.now(),
         trainName: name,
         trainNumber: number,
+        rakeNumber: rakeNumber,
         yard: yard,
         trainType: document.getElementById('masterTrainType').value,
         clusterManager: clusterManager,
         trainManager: trainManager,
         rakeManager: rakeManager,
+        businessHead: businessHead,
+        vp: vp,
         salesTarget: Math.round(Number(document.getElementById('masterSalesTarget').value)) || 0,
         gpTarget: Math.round(Number(document.getElementById('masterGpTarget').value)) || 0,
         validFrom: validFrom,
@@ -5449,15 +5874,18 @@ function showPage(page) {
       } else {
         const dupe = appData.trainMasters.find(t =>
           (normalizeTrainNo(t.trainNumber) === number) &&
+          (normalizeText(t.rakeNumber) === normalizeText(rakeNumber)) &&
           (t.validFrom || '') === validFrom &&
           (t.validTo || '') === (validTo || '')
         );
         if (dupe) {
-          showAlert('A target master already exists for this train and validity period. Please edit that entry.', 'error');
+          showAlert('A manager master already exists for this train, rake number and validity period. Please edit that entry.', 'error');
           return;
         }
         appData.trainMasters.push(train);
       }
+
+      applyGpTargetToTrain(number, name, train.gpTarget);
 
       saveData();
       clearMasterForm();
@@ -5467,11 +5895,29 @@ function showPage(page) {
       document.getElementById('noMasterDataWarning').classList.add('hidden');
     }
 
+    function loadTargetMasterTable() {
+      const tbody = document.getElementById('targetMasterTableBody');
+      if (!tbody) return;
+      const rows = [...(appData.targetMasters || [])].sort((a, b) => (a.trainName || '').localeCompare(b.trainName || '') || (b.validFrom || '').localeCompare(a.validFrom || ''));
+      tbody.innerHTML = rows.length ? rows.map(t => `
+        <tr>
+          <td>${t.trainName || '-'}</td>
+          <td>${t.trainNumber || '-'}</td>
+          <td>${formatDate(t.validFrom)}</td>
+          <td>${formatDate(t.validTo)}</td>
+          <td>${t.validDays || '-'}</td>
+          <td>${formatCurrency(t.salesTarget)}</td>
+          <td>${formatCurrency(t.gpTarget)}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="7" style="text-align:center;color:#64748b;">No Sales and GP Target Master uploaded.</td></tr>';
+    }
+
     function clearMasterForm() {
       editingId = null;
       editingType = null;
       document.getElementById('masterTrainName').value = '';
       document.getElementById('masterTrainNumber').value = '';
+      document.getElementById('masterRakeNumber').value = '';
       document.getElementById('masterYard').value = appData.yards[0] || '';
       document.getElementById('masterTrainType').value = 'WCB';
       document.getElementById('masterClusterManager').value = '';
@@ -5479,6 +5925,8 @@ function showPage(page) {
       document.getElementById('masterTrainManager').value = '';
       onMasterTrainManagerChange();
       document.getElementById('masterRakeManager').value = '';
+      document.getElementById('masterBusinessHead').value = '';
+      document.getElementById('masterVp').value = '';
       document.getElementById('masterSalesTarget').value = '';
       document.getElementById('masterGpTarget').value = '';
       document.getElementById('masterValidFrom').value = '';
@@ -5497,11 +5945,14 @@ function showPage(page) {
         <tr ${canEdit ? `ondblclick="editMasterRow(${t.id})" style="cursor:pointer;"` : ''}>
           <td>${t.trainName}</td>
           <td>${normalizeTrainNo(t.trainNumber) || t.trainNumber || ''}</td>
+          <td>${t.rakeNumber || '-'}</td>
           <td>${t.yard}</td>
           <td>${t.trainType}</td>
           <td>${t.clusterManager || '-'}</td>
           <td>${t.trainManager || '-'}</td>
           <td>${t.rakeManager || '-'}</td>
+          <td>${t.businessHead || '-'}</td>
+          <td>${t.vp || '-'}</td>
           <td>${t.validFrom || '-'}</td>
           <td>${t.validTo || 'Open'}</td>
           <td>${formatCurrency(t.salesTarget)}</td>
@@ -5523,6 +5974,7 @@ function showPage(page) {
       editingType = 'master';
       document.getElementById('masterTrainName').value = t.trainName || '';
       document.getElementById('masterTrainNumber').value = normalizeTrainNo(t.trainNumber) || t.trainNumber || '';
+      document.getElementById('masterRakeNumber').value = t.rakeNumber || '';
       document.getElementById('masterYard').value = t.yard || (appData.yards[0] || '');
       document.getElementById('masterTrainType').value = t.trainType || 'WCB';
       document.getElementById('masterClusterManager').value = t.clusterManager || '';
@@ -5530,6 +5982,8 @@ function showPage(page) {
       document.getElementById('masterTrainManager').value = t.trainManager || '';
       onMasterTrainManagerChange();
       document.getElementById('masterRakeManager').value = t.rakeManager || '';
+      document.getElementById('masterBusinessHead').value = t.businessHead || '';
+      document.getElementById('masterVp').value = t.vp || '';
       document.getElementById('masterSalesTarget').value = Math.round(Number(t.salesTarget) || 0);
       document.getElementById('masterGpTarget').value = Math.round(Number(t.gpTarget) || 0);
       document.getElementById('masterValidFrom').value = t.validFrom || '';
@@ -5800,6 +6254,31 @@ function showPage(page) {
       return String(trainNo || '').replace(/\D/g, '').substring(0, 5);
     }
 
+    function getLatestDataDate(rows) {
+      return (rows || []).map(r => getComparableDate(r.date)).filter(Boolean).sort().pop() || '';
+    }
+
+    function findDuplicateEntry(rows, date, trainNumber, trainName, excludeId = null) {
+      const day = getComparableDate(date);
+      const key = buildTrainKey(trainNumber, trainName);
+      return (rows || []).find(row => row.id != excludeId && getComparableDate(row.date) === day && buildTrainKey(row.trainNumber || row.trainNo, row.trainName) === key);
+    }
+
+    function pushOrOverwriteEntry(collectionName, entry, overwriteState) {
+      const duplicate = findDuplicateEntry(appData[collectionName], entry.date, entry.trainNumber || entry.trainNo, entry.trainName);
+      if (duplicate) {
+        if (overwriteState.value === null) {
+          overwriteState.value = confirm('Data is already available for same train number and date. Overwrite matching entries from this upload?');
+        }
+        if (!overwriteState.value) return false;
+        const index = appData[collectionName].findIndex(row => row.id == duplicate.id);
+        if (index >= 0) appData[collectionName][index] = { ...entry, id: duplicate.id };
+        return true;
+      }
+      appData[collectionName].push(entry);
+      return true;
+    }
+
     function normalizeText(value) {
       return String(value || '').trim().toLowerCase();
     }
@@ -5844,19 +6323,13 @@ function showPage(page) {
 
         let imported = 0;
         let skipped = 0;
+        const overwriteState = { value: null };
 
         rows.forEach(row => {
           const trainName = getColumnValue(row, ['Train Name', 'trainname', 'train', 'Train']);
           const trainNumber = getColumnValue(row, ['Train Number', 'trainnumber', 'trainno', 'TrainNo']);
           const dateValue = getColumnValue(row, ['Arrival Date', 'arrivaldate', 'date', 'Date']);
-          const yard = getColumnValue(row, ['Yard', 'yard']);
-          const clusterManager = getColumnValue(row, ['Cluster Manager', 'clustermanager']);
-          const trainManager = getColumnValue(row, ['Train Manager', 'trainmanager']);
-          const rakeManager = getColumnValue(row, ['Rake Manager', 'rakemanager']);
-          const trainType = getColumnValue(row, ['Train Type', 'traintype']);
-          const salesTarget = Number(getColumnValue(row, ['Sales Target', 'salestarget'])) || 0;
           const salesAchievement = Number(getColumnValue(row, ['Sales Achievement', 'salesachievement', 'achievement'])) || 0;
-          const gpTarget = Number(getColumnValue(row, ['Gross Profit Target', 'grossprofittarget', 'gptarget'])) || 0;
           const gpAchievement = Number(getColumnValue(row, ['Gross Profit Achievement', 'grossprofitachievement', 'gpachievement'])) || 0;
 
           let parsedDate = parseExcelDate(dateValue);
@@ -5865,46 +6338,35 @@ function showPage(page) {
 
           const normalizedTrainNo = normalizeTrainNo(trainNumber);
           const stableTrainNo = normalizedTrainNo || String(trainNumber || '').trim();
-          ensureYardExists(yard);
 
           let train = findTrainByKey(stableTrainNo, trainName);
-          if (!train) {
-            train = {
-              id: Date.now() + Math.random(),
-              trainName: trainName,
-              trainNumber: stableTrainNo,
-              yard: yard || appData.yards[0] || 'Howrah',
-              clusterManager: clusterManager || '',
-              trainManager: trainManager || '',
-              rakeManager: rakeManager || '',
-              trainType: trainType || 'WCB',
-              salesTarget: Math.round(salesTarget),
-              gpTarget: Math.round(gpTarget)
-            };
-            appData.trainMasters.push(train);
-          }
+          const effective = getEffectiveMaster(stableTrainNo, trainName, parsedDate) || train;
+          if (!effective) { skipped++; return; }
 
           const entry = {
             id: Date.now() + Math.random(),
             date: parsedDate,
             month: new Date(parsedDate).toLocaleString('en-US', { month: 'short' }),
-            trainId: train.id,
-            trainName: trainName,
+            trainId: effective.id,
+            trainName: effective.trainName || trainName,
             trainNumber: stableTrainNo,
-            yard: yard || train.yard,
-            clusterManager: clusterManager || train.clusterManager,
-            trainManager: trainManager || train.trainManager,
-            rakeManager: rakeManager || train.rakeManager,
-            trainType: trainType || train.trainType,
-            salesTarget: Math.round(salesTarget),
+            yard: effective.yard || '',
+            clusterManager: effective.clusterManager || '',
+            trainManager: effective.trainManager || '',
+            rakeManager: effective.rakeManager || '',
+            rakeNumber: effective.rakeNumber || '',
+            businessHead: effective.businessHead || '',
+            vp: effective.vp || '',
+            trainType: effective.trainType || '',
+            salesTarget: getTrainSalesTarget(stableTrainNo, trainName, parsedDate),
             salesAchievement: Math.round(salesAchievement),
-            gpTarget: Math.round(gpTarget),
+            gpTarget: getTrainGpTarget(stableTrainNo, trainName, parsedDate),
             gpAchievement: Math.round(gpAchievement),
             remarks: 'Imported from Excel'
           };
 
-          appData.sales.push(entry);
-          imported++;
+          if (pushOrOverwriteEntry('sales', entry, overwriteState)) imported++;
+          else skipped++;
         });
 
         saveData();
@@ -5931,34 +6393,53 @@ function showPage(page) {
         const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
         let imported = 0;
+        let skipped = 0;
+        const overwriteState = { value: null };
 
         rows.forEach(row => {
+          const date = parseExcelDate(getColumnValue(row, ['Date', 'date', 'Complaint Date']));
+          const trainNo = normalizeTrainNo(getColumnValue(row, ['Train No', 'trainno', 'Train Number']) || '');
+          const trainName = getColumnValue(row, ['Train Name', 'trainname', 'Train']) || '';
+          const rakeManager = getColumnValue(row, ['Rake Manager', 'rakemanager']) || '';
+          const rakeNumber = getColumnValue(row, ['Rake Number', 'rakeno', 'rakenumber']) || '';
+          const options = getRakeOptionsForTrain(trainNo, trainName, date);
+          const effective = getEffectiveMaster(trainNo, trainName, date, rakeManager, rakeNumber) || (options.length === 1 ? options[0] : null);
+          const finalRakeManager = rakeManager || effective?.rakeManager || '';
+          if (!date || !trainNo || !effective || !finalRakeManager) { skipped++; return; }
+
           const complaint = {
             id: Date.now() + Math.random(),
-            date: parseExcelDate(getColumnValue(row, ['Date', 'date', 'Complaint Date'])),
+            date: date,
             complaintId: getColumnValue(row, ['Complaint ID', 'complaintid', 'ID']) || 'CMP' + Date.now(),
             source: getColumnValue(row, ['Source', 'source', 'Complaint Source']) || 'Other',
             status: getColumnValue(row, ['Status', 'status']) || 'Open',
-            trainNo: normalizeTrainNo(getColumnValue(row, ['Train No', 'trainno', 'Train Number']) || ''),
-            trainName: getColumnValue(row, ['Train Name', 'trainname', 'Train']) || '',
-            trainType: getColumnValue(row, ['Train Type', 'traintype']) || '',
-            yard: getColumnValue(row, ['Yard', 'yard']) || appData.yards[0] || '',
+            trainNo: trainNo,
+            trainNumber: trainNo,
+            trainName: effective?.trainName || trainName,
+            trainType: effective?.trainType || getColumnValue(row, ['Train Type', 'traintype']) || '',
+            yard: effective?.yard || getColumnValue(row, ['Yard', 'yard']) || appData.yards[0] || '',
+            rakeManager: finalRakeManager,
+            rakeNumber: rakeNumber || effective?.rakeNumber || '',
+            trainManager: effective?.trainManager || '',
+            businessHead: effective?.businessHead || '',
+            vp: effective?.vp || '',
             complainantName: getColumnValue(row, ['Complainant Name', 'complainantname', 'Name']) || '',
             mobileNo: getColumnValue(row, ['Mobile No', 'mobileno', 'Mobile']) || '',
             pnrNo: getColumnValue(row, ['PNR No', 'pnrno', 'PNR']) || '',
             complaintType: getColumnValue(row, ['Complaint Type', 'complainttype', 'Type']) || '',
-            complainNature: getColumnValue(row, ['Complain Nature', 'complainnature', 'Nature']) || '',
-            details: getColumnValue(row, ['Details', 'details', 'Description']) || '',
-            remarks: getColumnValue(row, ['Remarks', 'remarks']) || 'Imported from Excel'
+            complainNature: getColumnValue(row, ['Nature', 'Complaint Nature', 'Complain Nature', 'complainnature']) || '',
+            details: getColumnValue(row, ['Complaint Matter', 'Details', 'details', 'Description']) || '',
+            remarks: getColumnValue(row, ['Licensee Remarks', 'Remarks', 'remarks']) || 'Imported from Excel'
           };
 
           ensureYardExists(complaint.yard);
-          if (complaint.date && complaint.trainName) { appData.complaints.push(complaint); imported++; }
+          if (pushOrOverwriteEntry('complaints', complaint, overwriteState)) imported++;
+          else skipped++;
         });
 
         saveData();
         input.value = '';
-        showAlert(`${imported} complaints imported successfully`, 'success');
+        showAlert(`${imported} complaints imported successfully, ${skipped} skipped`, 'success');
         loadComplaintList();
         loadDashboard();
 
@@ -5977,18 +6458,31 @@ function showPage(page) {
         const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
         let imported = 0;
+        let skipped = 0;
+        const overwriteState = { value: null };
 
         rows.forEach(row => {
           const cashDepositCounter = Math.round(Number(getColumnValue(row, ['Deposited in Cash', 'cashdeposit', 'Cash Deposit', 'DepositedinCash']))) || 0;
           const onlineDeposit = Math.round(Number(getColumnValue(row, ['Deposited through Online', 'onlinedeposit', 'Online Deposit', 'DepositedthroughOnline']))) || 0;
           const gpFromSales = Math.round(Number(getColumnValue(row, ['GP Achievement', 'gpachievement', 'GP From Sales']))) || 0;
+          const date = parseExcelDate(getColumnValue(row, ['Date', 'date']));
+          const trainName = getColumnValue(row, ['Train Name', 'trainname', 'Train']) || '';
+          const trainNumber = normalizeTrainNo(getColumnValue(row, ['Train Number', 'trainnumber', 'TrainNo']) || '');
+          const master = getEffectiveMaster(trainNumber, trainName, date);
+          if ((trainName || trainNumber) && !master) { skipped++; return; }
           
           const entry = {
             id: Date.now() + Math.random(),
-            date: parseExcelDate(getColumnValue(row, ['Date', 'date'])),
-            yard: getColumnValue(row, ['Yard', 'yard']) || appData.yards[0] || '',
-            trainName: getColumnValue(row, ['Train Name', 'trainname', 'Train']) || '',
-            trainNumber: normalizeTrainNo(getColumnValue(row, ['Train Number', 'trainnumber', 'TrainNo']) || ''),
+            date: date,
+            yard: master?.yard || getColumnValue(row, ['Yard', 'yard']) || appData.yards[0] || '',
+            trainId: master?.id || '',
+            trainName: master?.trainName || trainName,
+            trainNumber: master ? (normalizeTrainNo(master.trainNumber) || master.trainNumber || '') : trainNumber,
+            trainManager: master?.trainManager || '',
+            rakeManager: master?.rakeManager || '',
+            rakeNumber: master?.rakeNumber || '',
+            businessHead: master?.businessHead || '',
+            vp: master?.vp || '',
             gpFromSales: gpFromSales,
             gpCollected: Math.round(Number(getColumnValue(row, ['GP Collected', 'gpcollected', 'CashCollected']))) || 0,
             cashDepositCounter: cashDepositCounter,
@@ -5999,12 +6493,13 @@ function showPage(page) {
           };
 
           ensureYardExists(entry.yard);
-          if (entry.date && entry.yard) { appData.cash.push(entry); imported++; }
+          if (entry.date && entry.yard && pushOrOverwriteEntry('cash', entry, overwriteState)) imported++;
+          else skipped++;
         });
 
         saveData();
         input.value = '';
-        showAlert(`${imported} cash entries imported successfully`, 'success');
+        showAlert(`${imported} cash entries imported/updated successfully, ${skipped} skipped`, 'success');
         loadCashList();
         loadCashDashboard();
         loadDashboard();
@@ -6020,10 +6515,11 @@ function showPage(page) {
       try {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        const rows = getRowsFromWorkbookByHeaders(workbook, ['TRAIN NO', 'TRAIN NAME', 'YARD NAME']);
 
         let imported = 0;
+        let skipped = 0;
+        let overwriteAll = null;
 
         rows.forEach(row => {
           const validFrom = parseExcelDate(getColumnValue(row, ['Valid From', 'validfrom', 'Start Date', 'startdate'])) || '';
@@ -6036,20 +6532,37 @@ function showPage(page) {
           }
           const train = {
             id: Date.now() + Math.random(),
-            trainName: getColumnValue(row, ['Train Name', 'trainname', 'Train']) || '',
-            trainNumber: normalizeTrainNo(getColumnValue(row, ['Train Number', 'trainnumber', 'TrainNo']) || ''),
-            yard: getColumnValue(row, ['Yard', 'yard']) || appData.yards[0] || '',
+            trainName: getColumnValue(row, ['Train Name', 'trainname', 'Train', 'TRAIN NAME']) || '',
+            trainNumber: normalizeTrainNo(getColumnValue(row, ['Train Number', 'trainnumber', 'TrainNo', 'TRAIN NO']) || ''),
+            rakeNumber: String(getColumnValue(row, ['Rake Number', 'rakenumber', 'Rake No', 'rakeno', 'No Of Rakes', 'NoOfRakes', 'RACKS']) || '').trim(),
+            yard: getColumnValue(row, ['Yard', 'yard', 'YARD NAME']) || appData.yards[0] || '',
             trainType: getColumnValue(row, ['Train Type', 'traintype']) || 'WCB',
-            clusterManager: getColumnValue(row, ['Cluster Manager', 'clustermanager']) || '',
-            trainManager: getColumnValue(row, ['Train Manager', 'trainmanager']) || '',
-            rakeManager: getColumnValue(row, ['Rake Manager', 'rakemanager']) || '',
+            clusterManager: getColumnValue(row, ['Cluster Manager', 'clustermanager', 'Cluster No.']) || '',
+            trainManager: getColumnValue(row, ['Train Manager', 'trainmanager', 'TRAIN MANAGER(Yard mgr)', 'TRAIN MANAGER(yard mgr)']) || '',
+            rakeManager: getColumnValue(row, ['Rake Manager', 'rakemanager', 'Rake Manager ', 'NAME']) || '',
+            businessHead: getColumnValue(row, ['Business Head', 'businesshead']) || '',
+            vp: getColumnValue(row, ['VP', 'Vice President', 'vicepresident', 'VP,s']) || '',
+            rakeManagerContact: getColumnValue(row, ['CONTACT NO', 'Contact No', 'Rake Manager Contact']) || '',
+            trainManagerContact: getColumnValue(row, ['TRAIN MANAGER NUMBER', 'Train Manager Number']) || '',
+            businessHeadContact: getColumnValue(row, ['BUSINESS HEAD MOBILE NUMBER', 'Business Head Mobile Number']) || '',
+            vpContact: getColumnValue(row, ['VP,s MOBILE NUMBER', 'VP Mobile Number']) || '',
+            cashier: getColumnValue(row, ['CASHIER', 'Cashier']) || '',
+            cashierContact: getColumnValue(row, ['CASHIER MOBILE NO', 'Cashier Mobile No']) || '',
+            zone: getColumnValue(row, ['ZONE', 'Zone']) || '',
+            railwayZone: getColumnValue(row, ['RLY ZONE', 'Railway Zone']) || '',
+            irctcZone: getColumnValue(row, ['IRCTC ZONE', 'IRCTC Zone']) || '',
+            registeredFirm: getColumnValue(row, ['REGISTERED FIRM', 'Registered Firm']) || '',
+            origin: getColumnValue(row, ['ORIGIN-(Yard) (DEPARTURE STATION)', 'Origin']) || '',
+            destination: getColumnValue(row, ['DESTINATION', 'Destination']) || '',
+            arrivalDays: getColumnValue(row, ['ARRIVAL DAYS', 'Arrival Days']) || '',
+            runningFrequency: getColumnValue(row, ['RUNNING FREQUENCY', 'Running Frequency']) || '',
             salesTarget: Math.round(Number(getColumnValue(row, ['Sales Target', 'salestarget']))) || 0,
             gpTarget: Math.round(Number(getColumnValue(row, ['GP Target', 'gptarget', 'GrossProfitTarget']))) || 0,
             validFrom: validFrom || '',
             validTo: validTo || ''
           };
 
-          if (train.trainName) {
+          if (train.trainName && train.trainNumber && train.rakeNumber) {
             ensureYardExists(train.yard);
             if (train.trainManager && train.clusterManager) appData.trainManagerHierarchy[train.trainManager] = train.clusterManager;
             if (train.rakeManager && train.trainManager) appData.rakeManagerHierarchy[train.rakeManager] = train.trainManager;
@@ -6057,29 +6570,132 @@ function showPage(page) {
 
             const existing = (appData.trainMasters || []).find(t =>
               normalizeTrainNo(t.trainNumber) === train.trainNumber &&
+              normalizeText(t.rakeNumber) === normalizeText(train.rakeNumber) &&
               (t.validFrom || '') === (train.validFrom || '') &&
               (t.validTo || '') === (train.validTo || '')
             );
-            if (!existing) { appData.trainMasters.push(train); imported++; }
+            if (existing) {
+              if (overwriteAll === null) overwriteAll = confirm('Train Manager Master already has data for same train, rake and validity period. Overwrite matching entries from this upload?');
+              if (overwriteAll) {
+                const index = appData.trainMasters.findIndex(t => t.id == existing.id);
+                if (index >= 0) appData.trainMasters[index] = { ...train, id: existing.id };
+                applyGpTargetToTrain(train.trainNumber, train.trainName, train.gpTarget);
+                imported++;
+              } else {
+                skipped++;
+              }
+            } else {
+              appData.trainMasters.push(train);
+              applyGpTargetToTrain(train.trainNumber, train.trainName, train.gpTarget);
+              imported++;
+            }
+          } else {
+            skipped++;
           }
         });
 
         saveData();
         input.value = '';
-        showAlert(`${imported} train masters imported successfully`, 'success');
+        showAlert(`${imported} train masters imported/updated successfully, ${skipped} skipped`, 'success');
         loadMasterTable();
+        loadTargetMasterTable();
         updateMasterTargetDisplay();
         document.getElementById('noMasterDataWarning').classList.add('hidden');
 
       } catch (error) { showAlert('Import failed: ' + error.message, 'error'); }
     }
 
+    async function importSalesGpTargetExcel(input) {
+      if (!ensureEditable('import target data')) { input.value = ''; return; }
+      const file = input.files[0];
+      if (!file) return;
+
+      try {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const rows = getRowsFromWorkbookByHeaders(workbook, ['Train Name', 'Train Number', 'Sales Target', 'GP Target']);
+
+        let imported = 0;
+        let skipped = 0;
+        let overwriteAll = null;
+        rows.forEach(row => {
+          const trainName = getColumnValue(row, ['Train Name', 'trainname', 'Train']) || '';
+          const trainNumber = normalizeTrainNo(getColumnValue(row, ['Train Number', 'trainnumber', 'TrainNo']) || '');
+          const validFrom = parseExcelDate(getColumnValue(row, ['Valid From', 'validfrom', 'Start Date'])) || '';
+          let validTo = parseExcelDate(getColumnValue(row, ['Valid To', 'validto', 'End Date'])) || '';
+          const validDays = Number(getColumnValue(row, ['Valid Days', 'validdays', 'Days'])) || 0;
+          if (!validTo && validFrom && validDays > 0) {
+            const d = new Date(validFrom);
+            d.setDate(d.getDate() + validDays - 1);
+            validTo = d.toISOString().split('T')[0];
+          }
+          const master = findTrainByKey(trainNumber, trainName);
+          const salesTarget = Math.round(Number(getColumnValue(row, ['Sales Target', 'salestarget']))) || 0;
+          const gpTarget = Math.round(Number(getColumnValue(row, ['GP Target', 'gptarget', 'Gross Profit Target', 'grossprofittarget']))) || 0;
+          if (!master || !validFrom || (!salesTarget && !gpTarget)) { skipped++; return; }
+          const target = {
+            id: Date.now() + Math.random(),
+            trainName: master.trainName || trainName,
+            trainNumber: normalizeTrainNo(master.trainNumber) || trainNumber,
+            validFrom,
+            validTo,
+            validDays: validDays || (validFrom && validTo ? Math.max(1, Math.round((new Date(validTo) - new Date(validFrom)) / 86400000) + 1) : ''),
+            salesTarget,
+            gpTarget
+          };
+          const duplicate = (appData.targetMasters || []).find(t =>
+            buildTrainKey(t.trainNumber, t.trainName) === buildTrainKey(target.trainNumber, target.trainName) &&
+            (t.validFrom || '') === target.validFrom &&
+            (t.validTo || '') === target.validTo
+          );
+          if (duplicate) {
+            if (overwriteAll === null) overwriteAll = confirm('Sales and GP Target Master already has data for same train and date validity. Overwrite matching entries from this upload?');
+            if (!overwriteAll) { skipped++; return; }
+            const index = appData.targetMasters.findIndex(t => t.id == duplicate.id);
+            if (index >= 0) appData.targetMasters[index] = { ...target, id: duplicate.id };
+          } else {
+            appData.targetMasters.push(target);
+          }
+          imported++;
+        });
+
+        saveData();
+        input.value = '';
+        showAlert(`Sales and GP target import complete: ${imported} imported/updated, ${skipped} skipped`, 'success');
+        loadTargetMasterTable();
+        updateMasterTargetDisplay();
+      } catch (error) { showAlert('Import failed: ' + error.message, 'error'); }
+    }
+
+    function normalizeColumnKey(name) {
+      return String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    function getRowsFromWorkbookByHeaders(workbook, requiredHeaders) {
+      const required = requiredHeaders.map(normalizeColumnKey);
+      let bestRows = null;
+      for (const sheetName of workbook.SheetNames || []) {
+        const sheet = workbook.Sheets[sheetName];
+        const preview = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false });
+        const headerIndex = preview.findIndex(row => {
+          const keys = (row || []).map(normalizeColumnKey);
+          return required.every(req => keys.includes(req));
+        });
+        if (headerIndex >= 0) {
+          const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', range: headerIndex });
+          if (rows.length && (!bestRows || rows.length > bestRows.length)) bestRows = rows;
+        }
+      }
+      if (bestRows) return bestRows;
+      return XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' });
+    }
+
     function getColumnValue(row, possibleNames) {
       for (const name of possibleNames) {
         if (row[name] !== undefined && row[name] !== '') return row[name];
-        const lowerName = name.toLowerCase().replace(/\s/g, '');
+        const lowerName = normalizeColumnKey(name);
         for (const key of Object.keys(row)) {
-          const cleanKey = key.toLowerCase().replace(/\s/g, '');
+          const cleanKey = normalizeColumnKey(key);
           if (cleanKey === lowerName) return row[key];
         }
       }
@@ -6107,15 +6723,8 @@ function showPage(page) {
         'Month': 'Apr',
         'Train Number': '12345',
         'Arrival Date': new Date().toISOString().split('T')[0],
-        'Cluster Manager': 'Manager A',
-        'Train Manager': 'Manager B',
-        'Rake Manager': 'Rake M',
-        'Train Type': 'WCB',
         'Train Name': 'Sample Express',
-        'Sales Target': 100000,
         'Sales Achievement': 95000,
-        'Yard': 'Howrah',
-        'Gross Profit Target': 45000,
         'Gross Profit Achievement': 42000
       }];
       downloadExcel(data, 'sales_import_sample.xlsx');
@@ -6129,8 +6738,13 @@ function showPage(page) {
         'Status': 'Open',
         'Train No': '12345',
         'Train Name': 'Sample Express',
+        'Rake Manager': 'Rake M',
+        'Rake Number': 'Rake-01',
         'Train Type': 'WCB',
         'Yard': 'Howrah',
+        'Train Manager': 'Manager B',
+        'Business Head': 'Business Head A',
+        'VP': 'VP A',
         'Complainant Name': 'John Doe',
         'Mobile No': '9876543210',
         'PNR No': '1234567890',
@@ -6162,20 +6776,71 @@ function showPage(page) {
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + 29);
       const data = [{
+        'S.NO': 1,
+        'TRAIN NO': '12345-046',
+        'TRAIN NAME': 'Sample Express',
+        'TRAIN TYPE': 'WCB',
+        'ZONE': 'EZ 2',
+        'YARD NAME': 'Howrah',
+        'ARRIVAL DAYS': 'Daily',
+        'RUNNING FREQUENCY': 7,
+        'VP,s': 'VP A',
+        'VP,s MOBILE NUMBER': '9000000000',
+        'BUSINESS HEAD': 'Business Head A',
+        'BUSINESS HEAD MOBILE NUMBER': '9000000001',
+        'TRAIN MANAGER(yard mgr)': 'Manager B',
+        'TRAIN MANAGER NUMBER': '9000000002',
+        'CASHIER': 'Cashier A',
+        'CASHIER MOBILE NO': '9000000003',
+        'RACKS': 2,
+        'Cluster No.': 'ER/CLT/A-1',
+        'RLY ZONE': 'ER',
+        'IRCTC ZONE': 'EZ',
+        'REGISTERED FIRM': 'RK',
+        'ORIGIN-(Yard) (DEPARTURE STATION)': 'HOWRAH',
+        'DESTINATION': 'NEW DELHI',
+        'No Of Rakes': 'R-1',
+        'NAME': 'Rake M',
+        'CONTACT NO': '9000000004',
+        'Valid From': start,
+        'Valid To': endDate.toISOString().split('T')[0],
+        'Valid Days': 30,
+        'Sales Target': 100000,
+        'GP Target': 45000
+      }, {
         'Train Name': 'Sample Express',
         'Train Number': '12345',
+        'Rake Number': 'Rake-01',
         'Yard': 'Howrah',
         'Train Type': 'WCB',
         'Cluster Manager': 'Manager A',
         'Train Manager': 'Manager B',
         'Rake Manager': 'Rake M',
+        'Business Head': 'Business Head A',
+        'VP': 'VP A',
         'Valid From': start,
         'Valid To': endDate.toISOString().split('T')[0],
         'Valid Days': 30,
         'Sales Target': 100000,
         'GP Target': 45000
       }];
-      downloadExcel(data, 'master_import_sample.xlsx');
+      downloadExcel(data, 'manager_master_import_sample.xlsx');
+    }
+
+    function downloadGpTargetSample() {
+      const today = new Date().toISOString().split('T')[0];
+      const end = new Date();
+      end.setDate(end.getDate() + 29);
+      const data = [{
+        'Train Name': 'Sample Express',
+        'Train Number': '12345',
+        'Valid From': today,
+        'Valid To': end.toISOString().split('T')[0],
+        'Valid Days': 30,
+        'Sales Target': 100000,
+        'GP Target': 45000
+      }];
+      downloadExcel(data, 'sales_gp_target_import_sample.xlsx');
     }
 
     function downloadMasterData() { downloadExcel(appData.trainMasters, 'train_master_export.xlsx'); }
@@ -6266,6 +6931,7 @@ function showPage(page) {
           clusterManagers: appData.clusterManagers,
           trainManagers: appData.trainManagers,
           trainMasters: appData.trainMasters,
+          targetMasters: appData.targetMasters,
           sales: appData.sales,
           complaints: appData.complaints,
           cash: appData.cash,
@@ -6307,6 +6973,7 @@ function showPage(page) {
         if (cloudData.clusterManagers) appData.clusterManagers = cloudData.clusterManagers;
         if (cloudData.trainManagers) appData.trainManagers = cloudData.trainManagers;
         if (cloudData.trainMasters) appData.trainMasters = cloudData.trainMasters;
+        if (cloudData.targetMasters) appData.targetMasters = cloudData.targetMasters;
         if (cloudData.sales) appData.sales = cloudData.sales;
         if (cloudData.complaints) appData.complaints = cloudData.complaints;
         if (cloudData.cash) appData.cash = cloudData.cash;
@@ -6398,6 +7065,12 @@ function showPage(page) {
     window.editCashEntry = editCashEntry;
     window.deleteCashEntry = deleteCashEntry;
     window.saveTrainMaster = saveTrainMaster;
+    window.importSalesGpTargetExcel = importSalesGpTargetExcel;
+    window.deleteAllSalesData = deleteAllSalesData;
+    window.deleteAllComplaintData = deleteAllComplaintData;
+    window.deleteAllCashData = deleteAllCashData;
+    window.deleteAllTrainMasters = deleteAllTrainMasters;
+    window.deleteAllTargetMasters = deleteAllTargetMasters;
     window.clearMasterForm = clearMasterForm;
     window.editMasterRow = editMasterRow;
     window.onMasterClusterChange = onMasterClusterChange;
