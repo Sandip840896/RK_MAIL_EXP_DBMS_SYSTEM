@@ -160,6 +160,14 @@
     .form-field input:focus, .form-field select:focus, .form-field textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); }
     .form-field input:read-only { background: #f1f5f9; color: #64748b; }
     .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .compact-table-container { max-height: 430px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .compact-table-container table { min-width: 1250px; }
+    .compact-table-container thead th { position: sticky; top: 0; z-index: 2; }
+    .table-filter-row th { top: 35px; background: #fff; z-index: 3; padding: 6px; }
+    .table-filter-row input, .table-filter-row select { width: 100%; min-width: 90px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 11px; text-transform: none; }
+    .master-values-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .inline-control { display: flex; gap: 6px; align-items: center; min-width: 0; }
+    .inline-control input, .inline-control select { min-width: 0; }
     table { width: 100%; border-collapse: collapse; min-width: 600px; }
     th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
     th { background: #f8fafc; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; }
@@ -1214,8 +1222,8 @@
                   <input type="number" step="1" id="salesTarget" readonly>
                 </div>
                 <div class="form-field">
-                  <label>Sales Achievement *</label>
-                  <input type="number" id="salesAchievement" oninput="calculateSalesPct()">
+                  <label>Total Sale *</label>
+                  <input type="number" id="salesAchievement" oninput="calculateSalesCostsAndGp()">
                 </div>
                 <div class="form-field">
                   <label>Achievement %</label>
@@ -1225,12 +1233,35 @@
 
               <div class="form-row">
                 <div class="form-field">
+                  <label>Ration Expense</label>
+                  <input type="number" id="salesRationExpense" oninput="calculateSalesCostsAndGp()">
+                </div>
+                <div class="form-field">
+                  <label>MISC Expense</label>
+                  <input type="number" id="salesMiscExpense" oninput="calculateSalesCostsAndGp()">
+                </div>
+                <div class="form-field">
+                  <label>Cash Commission (10%)</label>
+                  <input type="number" id="salesCashCommission" readonly>
+                </div>
+                <div class="form-field">
+                  <label>Staff Salary</label>
+                  <input type="number" id="salesStaffSalary" oninput="calculateSalesCostsAndGp()">
+                </div>
+                <div class="form-field">
+                  <label>Manager Salary</label>
+                  <input type="number" id="salesManagerSalary" oninput="calculateSalesCostsAndGp()">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-field">
                   <label>GP Target</label>
                   <input type="number" step="1" id="salesGpTarget" readonly>
                 </div>
                 <div class="form-field">
-                  <label>GP Achievement *</label>
-                  <input type="number" id="salesGpAchievement" oninput="calculateGpPct()">
+                  <label>GP Achievement (Auto)</label>
+                  <input type="number" id="salesGpAchievement" readonly>
                 </div>
                 <div class="form-field">
                   <label>GP Achievement %</label>
@@ -1292,7 +1323,7 @@
                       <th>Train</th>
                       <th>Yard</th>
                       <th>Sales</th>
-                      <th>GP</th>
+                      <th>Total Sale</th>
                       <th>Remarks</th>
                       <th>Actions</th>
                     </tr>
@@ -1603,7 +1634,7 @@
           <!-- Cash KPI Tiles -->
           <div class="grid grid-4">
             <div class="kpi-card info">
-              <div class="kpi-label">Total GP Collected</div>
+              <div class="kpi-label">Total Sale To Collect</div>
               <div class="kpi-value" id="cashKpiGpCollected">₹0</div>
               <div class="kpi-sub">From sales entries</div>
             </div>
@@ -1628,12 +1659,12 @@
             <div class="kpi-card danger" id="shortageCard" style="display: none;">
               <div class="kpi-label">Shortage Amount</div>
               <div class="kpi-value" id="cashKpiShortage">₹0</div>
-              <div class="kpi-sub">GP - Total Deposit</div>
+              <div class="kpi-sub">Sale - Total Deposit</div>
             </div>
             <div class="kpi-card success" id="excessCard" style="display: none;">
               <div class="kpi-label">Excess Amount</div>
               <div class="kpi-value" id="cashKpiExcess">₹0</div>
-              <div class="kpi-sub">Deposit > GP</div>
+              <div class="kpi-sub">Deposit > Sale</div>
             </div>
             <div class="kpi-card info">
               <div class="kpi-label">Records Count</div>
@@ -1643,7 +1674,7 @@
             <div class="kpi-card warning">
               <div class="kpi-label">Pending Shortage</div>
               <div class="kpi-value" id="cashKpiPendingShortage">0</div>
-              <div class="kpi-sub">Without reason</div>
+              <div class="kpi-sub">Short deposits</div>
             </div>
           </div>
 
@@ -1652,7 +1683,7 @@
             <div class="card-header">
               <div>
                 <h3 class="card-title">Manager-wise Cash Deposit Summary</h3>
-                <p class="card-subtitle">GP Achievement vs Cash Deposit comparison</p>
+                <p class="card-subtitle">Total sale vs cash and online deposit comparison</p>
               </div>
               <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('managerCashTable', 'manager_cash_summary')">
                 <i class="fas fa-file-excel"></i>
@@ -1663,7 +1694,7 @@
                 <thead>
                   <tr>
                     <th>Manager</th>
-                    <th>GP</th>
+                    <th>Amount To Collect</th>
                     <th>Cash</th>
                     <th>Online</th>
                     <th>Total</th>
@@ -1672,6 +1703,35 @@
                   </tr>
                 </thead>
                 <tbody id="managerCashTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">Rake Manager-wise Pending Deposit</h3>
+                <p class="card-subtitle">Same-day sales not fully collected in cash or online</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('pendingDepositTable', 'pending_deposit')">
+                <i class="fas fa-file-excel"></i>
+              </button>
+            </div>
+            <div class="table-container">
+              <table id="pendingDepositTable">
+                <thead>
+                  <tr>
+                    <th>Rake Manager</th>
+                    <th>Train Manager</th>
+                    <th>Train</th>
+                    <th>Rake Number</th>
+                    <th>Date</th>
+                    <th>Total Sale</th>
+                    <th>Total Deposited</th>
+                    <th>Amount Pending</th>
+                  </tr>
+                </thead>
+                <tbody id="pendingDepositTableBody"></tbody>
               </table>
             </div>
           </div>
@@ -1702,13 +1762,13 @@
             <div id="cashEntryTab">
               <div id="shortageAlert" class="shortage-alert hidden">
                 <h4><i class="fas fa-exclamation-triangle"></i> Shortage Detected</h4>
-                <p>Total deposit is less than GP Achievement. Please provide a reason.</p>
+                <p>Total deposit is less than amount to be collected. Please provide a reason.</p>
               </div>
 
               <div class="form-row">
                 <div class="form-field">
                   <label>Date *</label>
-                  <input type="date" id="cashDate" value="">
+                  <input type="date" id="cashDate" value="" onchange="updateCashGPFromSales()">
                 </div>
                 <div class="form-field">
                   <label>Yard *</label>
@@ -1738,8 +1798,8 @@
 
               <div class="form-row">
                 <div class="form-field">
-                  <label>GP Achievement (Auto)</label>
-                  <input type="number" id="cashGpFromSales" readonly placeholder="Will be auto-filled">
+                  <label>Amount To Be Collected</label>
+                  <input type="number" id="cashGpFromSales" oninput="checkShortage()" placeholder="Auto-filled from same-day sales">
                 </div>
                 <div class="form-field">
                   <label>Cash Deposit (Counter) *</label>
@@ -1753,11 +1813,15 @@
                   <label>Total Deposit</label>
                   <input type="number" id="cashTotalDeposit" readonly>
                 </div>
+                <div class="form-field">
+                  <label>Balance Due</label>
+                  <input type="number" id="cashBalanceDue" readonly>
+                </div>
               </div>
 
               <div class="form-row" id="shortageReasonRow" style="display: none;">
                 <div class="form-field" style="grid-column: 1 / -1;">
-                  <label>Shortage Reason * <small style="color: #dc2626;">(Required when deposit < GP)</small></label>
+                  <label>Shortage Reason * <small style="color: #dc2626;">(Required when deposit < amount to be collected)</small></label>
                   <select id="cashShortageReason">
                     <option value="">Select Reason</option>
                     <option value="Cash Not Deposited">Cash Not Deposited</option>
@@ -1981,10 +2045,10 @@
 
           <div class="card">
             <h3 class="card-title">Master Values Management</h3>
-            <div class="grid grid-3">
+            <div class="master-values-grid">
               <div>
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; color: #475569; font-weight: 500;">Add New Yard</label>
-                <div style="display: flex; gap: 6px;">
+                <div class="inline-control">
                   <input type="text" id="newYard" placeholder="Yard name" style="flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; color: #1e293b; font-size: 14px;">
                   <button class="btn btn-success btn-sm" onclick="addYard()">
                     <i class="fas fa-plus"></i>
@@ -1993,7 +2057,7 @@
               </div>
               <div>
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; color: #475569; font-weight: 500;">Add Cluster Manager</label>
-                <div style="display: flex; gap: 6px;">
+                <div class="inline-control">
                   <input type="text" id="newClusterManager" placeholder="Manager name" style="flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; color: #1e293b; font-size: 14px;">
                   <button class="btn btn-success btn-sm" onclick="addClusterManager()">
                     <i class="fas fa-plus"></i>
@@ -2002,7 +2066,7 @@
               </div>
               <div>
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; color: #475569; font-weight: 500;">Add Train Manager</label>
-                <div style="display: flex; gap: 6px;">
+                <div class="inline-control">
                   <select id="newTrainManagerCluster" style="flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; color: #1e293b; font-size: 14px;"></select>
                   <input type="text" id="newTrainManager" placeholder="Manager name" style="flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; color: #1e293b; font-size: 14px;">
                   <button class="btn btn-success btn-sm" onclick="addTrainManager()">
@@ -2012,7 +2076,7 @@
               </div>
               <div>
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; color: #475569; font-weight: 500;">Add Rake Manager</label>
-                <div style="display: flex; gap: 6px;">
+                <div class="inline-control">
                   <select id="newRakeManagerTrain" style="flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; color: #1e293b; font-size: 14px;"></select>
                   <input type="text" id="newRakeManager" placeholder="Rake manager name" style="flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; color: #1e293b; font-size: 14px;">
                   <button class="btn btn-success btn-sm" onclick="addRakeManager()">
@@ -2035,7 +2099,7 @@
                 </button>
               </div>
             </div>
-            <div class="table-container">
+            <div class="table-container compact-table-container">
               <table id="masterTable">
                 <thead>
                   <tr>
@@ -2054,6 +2118,23 @@
                     <th>Sales Target</th>
                     <th>GP Target</th>
                     <th>Action</th>
+                  </tr>
+                  <tr class="table-filter-row">
+                    <th><input id="masterFilterTrain" placeholder="Filter" oninput="loadMasterTable()"></th>
+                    <th><input id="masterFilterNumber" placeholder="Filter" oninput="loadMasterTable()"></th>
+                    <th><input id="masterFilterRakeNo" placeholder="Filter" oninput="loadMasterTable()"></th>
+                    <th><select id="masterFilterYard" onchange="loadMasterTable()"><option value="">All</option></select></th>
+                    <th><select id="masterFilterType" onchange="loadMasterTable()"><option value="">All</option></select></th>
+                    <th><select id="masterFilterCluster" onchange="loadMasterTable()"><option value="">All</option></select></th>
+                    <th><select id="masterFilterManager" onchange="loadMasterTable()"><option value="">All</option></select></th>
+                    <th><select id="masterFilterRakeManager" onchange="loadMasterTable()"><option value="">All</option></select></th>
+                    <th><input id="masterFilterBusinessHead" placeholder="Filter" oninput="loadMasterTable()"></th>
+                    <th><input id="masterFilterVp" placeholder="Filter" oninput="loadMasterTable()"></th>
+                    <th><input id="masterFilterValidFrom" type="date" onchange="loadMasterTable()"></th>
+                    <th><input id="masterFilterValidTo" type="date" onchange="loadMasterTable()"></th>
+                    <th></th>
+                    <th></th>
+                    <th><button class="btn btn-ghost btn-sm" onclick="clearMasterTableFilters()">Clear</button></th>
                   </tr>
                 </thead>
                 <tbody id="masterTableBody"></tbody>
@@ -2255,6 +2336,23 @@
                   <i class="fas fa-redo"></i> Reset All
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div class="grid grid-2 hidden" id="primaryAdminDownloads" style="margin-bottom: 16px;">
+            <div class="card">
+              <h3 class="card-title"><i class="fas fa-code"></i> Download All Code</h3>
+              <p class="card-subtitle">Visible only to the primary super admin.</p>
+              <button class="btn btn-primary" onclick="downloadAllCode()">
+                <i class="fas fa-download"></i> Download All Code
+              </button>
+            </div>
+            <div class="card">
+              <h3 class="card-title"><i class="fas fa-file-excel"></i> Download All Data</h3>
+              <p class="card-subtitle">Exports system data into separate Excel sheets.</p>
+              <button class="btn btn-success" onclick="downloadAllDataExcel()">
+                <i class="fas fa-download"></i> Download All Data
+              </button>
             </div>
           </div>
 
@@ -4811,15 +4909,15 @@ function showPage(page) {
       if (yardFilter) { cashData = cashData.filter(c => c.yard === yardFilter); salesData = salesData.filter(s => s.yard === yardFilter); }
       if (managerFilter) { cashData = cashData.filter(c => { const train = appData.trainMasters.find(t => t.trainName === c.trainName); return train && train.trainManager === managerFilter; }); salesData = salesData.filter(s => s.trainManager === managerFilter); }
 
-      const gpCollected = salesData.reduce((sum, s) => sum + (Number(s.gpAchievement) || 0), 0);
+      const gpCollected = salesData.reduce((sum, s) => sum + (Number(s.salesAchievement || s.totalSale) || 0), 0);
       const totalDeposit = cashData.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
       const cashCounter = cashData.reduce((sum, c) => sum + (Number(c.cashDepositCounter) || 0), 0);
       const onlineDeposit = cashData.reduce((sum, c) => sum + (Number(c.onlineDeposit) || 0), 0);
       const difference = gpCollected - totalDeposit;
       const pendingShortage = cashData.filter(c => {
-        const gp = Number(c.gpFromSales) || 0;
+        const amountToCollect = Number(c.amountToCollect || c.gpFromSales || c.gpCollected) || 0;
         const deposit = Number(c.totalDeposit) || 0;
-        return deposit < gp && (!c.shortageReason || c.shortageReason === '');
+        return amountToCollect > 0 && deposit < amountToCollect;
       }).length;
 
       document.getElementById('cashKpiGpCollected').textContent = formatCurrency(gpCollected);
@@ -4847,6 +4945,7 @@ function showPage(page) {
       }
 
       renderManagerCashTable(cashData, salesData);
+      renderPendingDepositTable(cashData, salesData);
       if (!(appData.cash || []).length && !noDataPopupShown.cash) {
         noDataPopupShown.cash = true;
         showAlert('No cash deposit data uploaded.', 'warning');
@@ -4859,7 +4958,7 @@ function showPage(page) {
       salesData.forEach(s => {
         const manager = s.trainManager || 'Unassigned';
         if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
-        managerMap[manager].gpAchievement += Number(s.gpAchievement) || 0;
+        managerMap[manager].gpAchievement += Number(s.salesAchievement || s.totalSale) || 0;
       });
 
       cashData.forEach(c => {
@@ -4906,6 +5005,53 @@ function showPage(page) {
       `).join('');
     }
 
+    function isSameTrainForCashSale(cashEntry, saleEntry) {
+      if (!cashEntry || !saleEntry) return false;
+      if (cashEntry.trainId && saleEntry.trainId && String(cashEntry.trainId) === String(saleEntry.trainId)) return true;
+      return buildTrainKey(cashEntry.trainNumber, cashEntry.trainName) === buildTrainKey(saleEntry.trainNumber, saleEntry.trainName);
+    }
+
+    function renderPendingDepositTable(cashData, salesData) {
+      const tbody = document.getElementById('pendingDepositTableBody');
+      if (!tbody) return;
+      const rows = salesData.map(s => {
+        const matchingDeposits = cashData.filter(c => getComparableDate(c.date) === getComparableDate(s.date) && isSameTrainForCashSale(c, s));
+        const deposited = matchingDeposits.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
+        const totalSale = Number(s.salesAchievement || s.totalSale) || 0;
+        const latestCash = matchingDeposits.sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0];
+        return {
+          rakeManager: latestCash?.rakeManager || s.rakeManager || 'Unassigned',
+          trainManager: latestCash?.trainManager || s.trainManager || 'Unassigned',
+          trainName: s.trainName || latestCash?.trainName || '-',
+          rakeNumber: latestCash?.rakeNumber || s.rakeNumber || '-',
+          date: s.date || '',
+          totalSale,
+          deposited,
+          pending: totalSale - deposited
+        };
+      }).filter(r => r.pending > 0).sort((a, b) => b.pending - a.pending);
+      tbody.innerHTML = rows.length ? rows.map(r => `
+        <tr>
+          <td>${r.rakeManager}</td>
+          <td>${r.trainManager}</td>
+          <td>${r.trainName}</td>
+          <td>${r.rakeNumber}</td>
+          <td>${formatDate(r.date)}</td>
+          <td>${formatCurrency(r.totalSale)}</td>
+          <td>${formatCurrency(r.deposited)}</td>
+          <td><strong>${formatCurrency(r.pending)}</strong></td>
+        </tr>
+      `).join('') : '<tr><td colspan="8" style="text-align:center;color:#64748b;">No pending deposits for selected filters.</td></tr>';
+    }
+
+    function findSalesEntryForCash(date, trainId, trainNumber, trainName) {
+      const day = getComparableDate(date);
+      return (appData.sales || []).find(s => getComparableDate(s.date) === day && (
+        (trainId && String(s.trainId) === String(trainId)) ||
+        buildTrainKey(s.trainNumber, s.trainName) === buildTrainKey(trainNumber, trainName)
+      ));
+    }
+
     function clearCashDashFilters() {
       document.getElementById('cashDashFromDate').value = '';
       document.getElementById('cashDashToDate').value = '';
@@ -4917,14 +5063,17 @@ function showPage(page) {
     function updateCashGPFromSales() {
       const date = document.getElementById('cashDate').value;
       const trainId = document.getElementById('cashTrainId').value;
-      
-      if (date && trainId) {
-        const salesEntry = appData.sales.find(s => s.date === date && s.trainId == trainId);
-        if (salesEntry) {
-          document.getElementById('cashGpFromSales').value = salesEntry.gpAchievement || 0;
-        } else {
-          document.getElementById('cashGpFromSales').value = '';
-        }
+      const trainNumber = document.getElementById('cashTrainNo')?.value || '';
+      const trainName = document.getElementById('cashTrainSearch')?.value || '';
+      const salesEntry = date && (trainId || trainNumber || trainName) ? findSalesEntryForCash(date, trainId, trainNumber, trainName) : null;
+      if (salesEntry) {
+        document.getElementById('cashGpFromSales').value = Number(salesEntry.salesAchievement || salesEntry.totalSale) || 0;
+        document.getElementById('cashTrainManager').value = salesEntry.trainManager || '';
+        document.getElementById('cashRakeManager').value = salesEntry.rakeManager || '';
+        if (salesEntry.yard) document.getElementById('cashYard').value = salesEntry.yard;
+      } else if (date && (trainId || trainNumber || trainName)) {
+        document.getElementById('cashGpFromSales').value = '';
+        showAlert('Sales entry is required for the same train and date before cash deposit.', 'warning');
       }
       checkShortage();
     }
@@ -4938,6 +5087,8 @@ function showPage(page) {
       const shortageAlert = document.getElementById('shortageAlert');
       const shortageReasonRow = document.getElementById('shortageReasonRow');
       const shortageReason = document.getElementById('cashShortageReason');
+      const balanceInput = document.getElementById('cashBalanceDue');
+      if (balanceInput) balanceInput.value = Math.max(gp - total, 0);
 
       if (gp > 0 && total < gp) {
         shortageAlert.classList.remove('hidden');
@@ -5037,6 +5188,21 @@ function showPage(page) {
       document.getElementById('salesAchievementPct').value = pct + '%';
     }
 
+    function calculateSalesCostsAndGp() {
+      const totalSale = Number(document.getElementById('salesAchievement')?.value) || 0;
+      const ration = Number(document.getElementById('salesRationExpense')?.value) || 0;
+      const misc = Number(document.getElementById('salesMiscExpense')?.value) || 0;
+      const commission = Math.round(totalSale * 0.10);
+      const staff = Number(document.getElementById('salesStaffSalary')?.value) || 0;
+      const manager = Number(document.getElementById('salesManagerSalary')?.value) || 0;
+      const commissionInput = document.getElementById('salesCashCommission');
+      if (commissionInput) commissionInput.value = commission;
+      const gpInput = document.getElementById('salesGpAchievement');
+      if (gpInput) gpInput.value = Math.round(totalSale - (ration + misc + commission + staff + manager));
+      calculateSalesPct();
+      calculateGpPct();
+    }
+
     function calculateGpPct() {
       const target = Number(document.getElementById('salesGpTarget').value) || 0;
       const achievement = Number(document.getElementById('salesGpAchievement').value) || 0;
@@ -5056,12 +5222,13 @@ function showPage(page) {
       const trainId = document.getElementById('salesTrainId').value;
       const date = document.getElementById('salesDate').value;
       const salesAchievement = document.getElementById('salesAchievement').value;
+      calculateSalesCostsAndGp();
       const gpAchievement = document.getElementById('salesGpAchievement').value;
       const gpTarget = Number(document.getElementById('salesGpTarget').value) || 0;
       const remarks = document.getElementById('salesRemarks').value.trim();
 
-      if (!trainId || !date || !salesAchievement || !gpAchievement) {
-        showAlert('Please fill all required fields', 'error');
+      if (!trainId || !date || !salesAchievement) {
+        showAlert('Please fill train, date and total sale', 'error');
         return;
       }
 
@@ -5138,6 +5305,12 @@ function showPage(page) {
         trainType: effectiveTrain.trainType || train.trainType,
         salesTarget: getTrainSalesTarget(train.trainNumber, train.trainName, date),
         salesAchievement: Math.round(Number(salesAchievement)),
+        totalSale: Math.round(Number(salesAchievement)),
+        rationExpense: Math.round(Number(document.getElementById('salesRationExpense')?.value) || 0),
+        miscExpense: Math.round(Number(document.getElementById('salesMiscExpense')?.value) || 0),
+        cashCommission: Math.round(Number(document.getElementById('salesCashCommission')?.value) || 0),
+        staffSalary: Math.round(Number(document.getElementById('salesStaffSalary')?.value) || 0),
+        managerSalary: Math.round(Number(document.getElementById('salesManagerSalary')?.value) || 0),
         gpTarget: getTrainGpTarget(train.trainNumber, train.trainName, date),
         gpAchievement: Math.round(Number(gpAchievement)),
         remarks: document.getElementById('salesRemarks').value
@@ -5175,6 +5348,11 @@ function showPage(page) {
       document.getElementById('salesTarget').value = '';
       document.getElementById('salesAchievement').value = '';
       document.getElementById('salesAchievementPct').value = '';
+      document.getElementById('salesRationExpense').value = '';
+      document.getElementById('salesMiscExpense').value = '';
+      document.getElementById('salesCashCommission').value = '';
+      document.getElementById('salesStaffSalary').value = '';
+      document.getElementById('salesManagerSalary').value = '';
       document.getElementById('salesGpTarget').value = '';
       document.getElementById('salesGpAchievement').value = '';
       document.getElementById('salesGpAchievementPct').value = '';
@@ -5245,6 +5423,11 @@ function showPage(page) {
       document.getElementById('salesTarget').value = entry.salesTarget;
       document.getElementById('salesAchievement').value = entry.salesAchievement;
       document.getElementById('salesAchievementPct').value = entry.salesTarget > 0 ? Math.round((entry.salesAchievement / entry.salesTarget) * 100) + '%' : '0%';
+      document.getElementById('salesRationExpense').value = entry.rationExpense || '';
+      document.getElementById('salesMiscExpense').value = entry.miscExpense || '';
+      document.getElementById('salesCashCommission').value = entry.cashCommission || Math.round((Number(entry.salesAchievement) || 0) * 0.10);
+      document.getElementById('salesStaffSalary').value = entry.staffSalary || '';
+      document.getElementById('salesManagerSalary').value = entry.managerSalary || '';
       document.getElementById('salesGpTarget').value = entry.gpTarget;
       document.getElementById('salesGpAchievement').value = entry.gpAchievement;
       document.getElementById('salesGpAchievementPct').value = entry.gpTarget > 0 ? Math.round((entry.gpAchievement / entry.gpTarget) * 100) + '%' : '0%';
@@ -5470,7 +5653,7 @@ function showPage(page) {
     function loadOpenComplaintQueue() {
       const tbody = document.getElementById('openComplaintQueueBody');
       if (!tbody) return;
-      let rows = [...(appData.complaints || [])].filter(c => c.status === 'Open');
+      let rows = [...(appData.complaints || [])].filter(c => c.status === 'Open' || c.status === 'In Progress');
       if (currentUser.yard !== 'ALL') rows = rows.filter(c => c.yard === currentUser.yard);
       rows.sort((a, b) => new Date(b.date) - new Date(a.date));
       tbody.innerHTML = rows.slice(0, 100).map(c => `
@@ -5479,7 +5662,7 @@ function showPage(page) {
           <td>${c.complaintId || '-'}</td>
           <td>${c.trainName || '-'}</td>
           <td>${c.complainNature || c.complaintType || '-'}</td>
-          <td><span class="badge badge-danger">${c.status}</span></td>
+          <td><span class="badge badge-${c.status === 'Open' ? 'danger' : 'warning'}">${c.status}</span></td>
           <td>${isReadOnlyUser() ? '<span style="font-size:11px;color:#64748b;">View only</span>' : `<button class="btn-icon edit" onclick="editComplaint(${c.id})"><i class="fas fa-edit"></i></button>`}</td>
         </tr>
       `).join('');
@@ -5586,6 +5769,7 @@ function showPage(page) {
       const cash = Number(document.getElementById('cashDepositCounter').value) || 0;
       const online = Number(document.getElementById('cashOnlineDeposit').value) || 0;
       document.getElementById('cashTotalDeposit').value = cash + online;
+      checkShortage();
     }
 
     function saveCashEntry() {
@@ -5597,16 +5781,18 @@ function showPage(page) {
       const gpFromSales = Number(document.getElementById('cashGpFromSales').value) || 0;
       const shortageReason = document.getElementById('cashShortageReason').value;
 
-      if (!date || !yard) { showAlert('Please fill all required fields', 'error'); return; }
+      if (!date || !yard || !document.getElementById('cashTrainId').value) { showAlert('Please select date, yard and train', 'error'); return; }
+      const trainId = document.getElementById('cashTrainId').value;
+      const train = trainId ? appData.trainMasters.find(t => t.id == trainId) : null;
+      const salesEntry = train ? findSalesEntryForCash(date, trainId, train.trainNumber, train.trainName) : null;
+      if (!salesEntry) { showAlert('Cash deposit can be saved only after same-day sales entry for this train.', 'error'); return; }
 
       if (gpFromSales > 0 && (cashDeposit + onlineDeposit) < gpFromSales && !shortageReason) {
-        showAlert('Please select a shortage reason. Cash + Online deposit is less than GP Achievement.', 'error');
+        showAlert('Please select a shortage reason. Cash + Online deposit is less than amount to be collected.', 'error');
         document.getElementById('cashShortageReason').focus();
         return;
       }
 
-      const trainId = document.getElementById('cashTrainId').value;
-      const train = trainId ? appData.trainMasters.find(t => t.id == trainId) : null;
       const effective = train ? (getEffectiveMaster(train.trainNumber, train.trainName, date, train.rakeManager, train.rakeNumber) || train) : null;
       const duplicate = train ? findDuplicateEntry(appData.cash, date, train.trainNumber, train.trainName, editingId) : null;
       if (duplicate && !confirm('Cash deposit data is already available for same train number and date. Overwrite existing entry?')) return;
@@ -5624,7 +5810,8 @@ function showPage(page) {
         businessHead: effective?.businessHead || '',
         vp: effective?.vp || '',
         gpFromSales: gpFromSales,
-        gpCollected: Number(document.getElementById('cashGpCollected')?.value) || 0,
+        amountToCollect: gpFromSales,
+        gpCollected: gpFromSales,
         cashDepositCounter: cashDeposit,
         onlineDeposit: onlineDeposit,
         totalDeposit: cashDeposit + onlineDeposit,
@@ -5662,6 +5849,7 @@ function showPage(page) {
       document.getElementById('cashRakeManager').value = '';
       document.getElementById('cashGpFromSales').value = '';
       document.getElementById('cashGpCollected') && (document.getElementById('cashGpCollected').value = '');
+      document.getElementById('cashBalanceDue') && (document.getElementById('cashBalanceDue').value = '');
       document.getElementById('cashDepositCounter').value = '';
       document.getElementById('cashOnlineDeposit').value = '';
       document.getElementById('cashTotalDeposit').value = '';
@@ -5697,7 +5885,7 @@ function showPage(page) {
           <td>${formatDate(c.date)}</td>
           <td>${c.yard}</td>
           <td>${c.trainName || '-'}</td>
-          <td>${formatCurrency(c.gpFromSales || c.gpCollected)}</td>
+          <td>${formatCurrency(c.amountToCollect || c.gpFromSales || c.gpCollected)}</td>
           <td>${formatCurrency(c.cashDepositCounter)}</td>
           <td>${formatCurrency(c.onlineDeposit)}</td>
           <td>${formatCurrency(c.totalDeposit)}</td>
@@ -5724,11 +5912,12 @@ function showPage(page) {
       document.getElementById('cashTrainNo').value = c.trainNumber || '';
       document.getElementById('cashTrainManager').value = c.trainManager || '';
       document.getElementById('cashRakeManager').value = c.rakeManager || '';
-      document.getElementById('cashGpFromSales').value = c.gpFromSales || c.gpCollected || '';
+      document.getElementById('cashGpFromSales').value = c.amountToCollect || c.gpFromSales || c.gpCollected || '';
       if (document.getElementById('cashGpCollected')) document.getElementById('cashGpCollected').value = c.gpCollected || '';
       document.getElementById('cashDepositCounter').value = c.cashDepositCounter || '';
       document.getElementById('cashOnlineDeposit').value = c.onlineDeposit || '';
       document.getElementById('cashTotalDeposit').value = c.totalDeposit || '';
+      document.getElementById('cashBalanceDue') && (document.getElementById('cashBalanceDue').value = Math.max((Number(c.amountToCollect || c.gpFromSales || c.gpCollected) || 0) - (Number(c.totalDeposit) || 0), 0));
       document.getElementById('cashShortageReason').value = c.shortageReason || '';
       document.getElementById('cashRemarks').value = c.remarks || '';
 
@@ -5934,9 +6123,47 @@ function showPage(page) {
       document.getElementById('masterValidDays').value = '';
     }
 
+    function updateMasterFilterOptions(rows) {
+      const fill = (id, values) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const current = el.value;
+        el.innerHTML = '<option value="">All</option>' + [...new Set(values.filter(Boolean))].sort().map(v => `<option value="${v}">${v}</option>`).join('');
+        if ([...el.options].some(o => o.value === current)) el.value = current;
+      };
+      fill('masterFilterYard', rows.map(t => t.yard || ''));
+      fill('masterFilterType', rows.map(t => t.trainType || ''));
+      fill('masterFilterCluster', rows.map(t => t.clusterManager || ''));
+      fill('masterFilterManager', rows.map(t => t.trainManager || ''));
+      fill('masterFilterRakeManager', rows.map(t => t.rakeManager || ''));
+    }
+
+    function clearMasterTableFilters() {
+      ['masterFilterTrain','masterFilterNumber','masterFilterRakeNo','masterFilterBusinessHead','masterFilterVp','masterFilterValidFrom','masterFilterValidTo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      ['masterFilterYard','masterFilterType','masterFilterCluster','masterFilterManager','masterFilterRakeManager'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      loadMasterTable();
+    }
+
     function loadMasterTable() {
       const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'super_admin');
-      const sorted = [...(appData.trainMasters || [])].sort((a, b) => {
+      const allRows = [...(appData.trainMasters || [])];
+      updateMasterFilterOptions(allRows);
+      const includes = (value, filter) => !filter || String(value || '').toLowerCase().includes(String(filter || '').toLowerCase());
+      const exact = (value, filter) => !filter || String(value || '') === String(filter || '');
+      const sorted = allRows.filter(t =>
+        includes(t.trainName, document.getElementById('masterFilterTrain')?.value) &&
+        includes(normalizeTrainNo(t.trainNumber) || t.trainNumber, document.getElementById('masterFilterNumber')?.value) &&
+        includes(t.rakeNumber, document.getElementById('masterFilterRakeNo')?.value) &&
+        exact(t.yard, document.getElementById('masterFilterYard')?.value) &&
+        exact(t.trainType, document.getElementById('masterFilterType')?.value) &&
+        exact(t.clusterManager, document.getElementById('masterFilterCluster')?.value) &&
+        exact(t.trainManager, document.getElementById('masterFilterManager')?.value) &&
+        exact(t.rakeManager, document.getElementById('masterFilterRakeManager')?.value) &&
+        includes(t.businessHead, document.getElementById('masterFilterBusinessHead')?.value) &&
+        includes(t.vp, document.getElementById('masterFilterVp')?.value) &&
+        (!document.getElementById('masterFilterValidFrom')?.value || (t.validFrom || '') >= document.getElementById('masterFilterValidFrom').value) &&
+        (!document.getElementById('masterFilterValidTo')?.value || (t.validTo || '') <= document.getElementById('masterFilterValidTo').value)
+      ).sort((a, b) => {
         const n = String(a.trainName || '').localeCompare(String(b.trainName || ''));
         if (n !== 0) return n;
         return String(b.validFrom || '').localeCompare(String(a.validFrom || ''));
@@ -6149,9 +6376,14 @@ function showPage(page) {
 
     function loadUsersTable() {
       const isAdmin = currentUser.role === 'admin';
+      const primaryEmail = 'sandipnandi2000@gmail.com';
+      const isPrimary = (currentUser.email || '').toLowerCase() === primaryEmail;
       const formatPages = pages => (pages || []).map(page => PAGE_LABELS[page] || page).join(', ') || '-';
       
       document.getElementById('usersTableBody').innerHTML = (appData.users || []).map(u => {
+        if (!isPrimary && (u.email || '').toLowerCase() === primaryEmail) {
+          return '';
+        }
         if (isAdmin && u.role === 'super_admin' && u.email !== currentUser.email) {
           return `
             <tr>
@@ -6188,6 +6420,10 @@ function showPage(page) {
     function editUser(id) {
       const u = appData.users.find(x => x.id == id);
       if (!u) return;
+      if ((u.email || '').toLowerCase() === 'sandipnandi2000@gmail.com' && (currentUser.email || '').toLowerCase() !== 'sandipnandi2000@gmail.com') {
+        showAlert('Primary super admin account is hidden.', 'error');
+        return;
+      }
 
       document.getElementById('userFullName').value = u.name;
       document.getElementById('userEmail').value = u.email;
@@ -6220,6 +6456,8 @@ function showPage(page) {
       document.getElementById('summaryComplaints').textContent = (appData.complaints || []).length;
       document.getElementById('summaryCash').textContent = (appData.cash || []).length;
       document.getElementById('summaryYards').textContent = (appData.yards || []).length;
+      const primaryDownloads = document.getElementById('primaryAdminDownloads');
+      if (primaryDownloads) primaryDownloads.classList.toggle('hidden', (currentUser.email || '').toLowerCase() !== 'sandipnandi2000@gmail.com');
       
       // Update cloud status
       updateCloudStatus();
@@ -6329,8 +6567,14 @@ function showPage(page) {
           const trainName = getColumnValue(row, ['Train Name', 'trainname', 'train', 'Train']);
           const trainNumber = getColumnValue(row, ['Train Number', 'trainnumber', 'trainno', 'TrainNo']);
           const dateValue = getColumnValue(row, ['Arrival Date', 'arrivaldate', 'date', 'Date']);
-          const salesAchievement = Number(getColumnValue(row, ['Sales Achievement', 'salesachievement', 'achievement'])) || 0;
-          const gpAchievement = Number(getColumnValue(row, ['Gross Profit Achievement', 'grossprofitachievement', 'gpachievement'])) || 0;
+          const salesAchievement = Number(getColumnValue(row, ['Total Sale', 'totalsale', 'Sales Achievement', 'salesachievement', 'achievement'])) || 0;
+          const rationExpense = Math.round(Number(getColumnValue(row, ['Ration Expense', 'rationexpense']))) || 0;
+          const miscExpense = Math.round(Number(getColumnValue(row, ['MISC Expense', 'miscexpense', 'Misc Expense']))) || 0;
+          const cashCommission = Math.round(Number(getColumnValue(row, ['Cash Commission', 'cashcommission']))) || Math.round(salesAchievement * 0.10);
+          const staffSalary = Math.round(Number(getColumnValue(row, ['Staff Salary', 'staffsalary']))) || 0;
+          const managerSalary = Math.round(Number(getColumnValue(row, ['Manager Salary', 'managersalary']))) || 0;
+          const importedGp = Number(getColumnValue(row, ['Gross Profit Achievement', 'grossprofitachievement', 'gpachievement'])) || 0;
+          const gpAchievement = importedGp || (salesAchievement - (rationExpense + miscExpense + cashCommission + staffSalary + managerSalary));
 
           let parsedDate = parseExcelDate(dateValue);
 
@@ -6360,6 +6604,12 @@ function showPage(page) {
             trainType: effective.trainType || '',
             salesTarget: getTrainSalesTarget(stableTrainNo, trainName, parsedDate),
             salesAchievement: Math.round(salesAchievement),
+            totalSale: Math.round(salesAchievement),
+            rationExpense,
+            miscExpense,
+            cashCommission,
+            staffSalary,
+            managerSalary,
             gpTarget: getTrainGpTarget(stableTrainNo, trainName, parsedDate),
             gpAchievement: Math.round(gpAchievement),
             remarks: 'Imported from Excel'
@@ -6464,12 +6714,14 @@ function showPage(page) {
         rows.forEach(row => {
           const cashDepositCounter = Math.round(Number(getColumnValue(row, ['Deposited in Cash', 'cashdeposit', 'Cash Deposit', 'DepositedinCash']))) || 0;
           const onlineDeposit = Math.round(Number(getColumnValue(row, ['Deposited through Online', 'onlinedeposit', 'Online Deposit', 'DepositedthroughOnline']))) || 0;
-          const gpFromSales = Math.round(Number(getColumnValue(row, ['GP Achievement', 'gpachievement', 'GP From Sales']))) || 0;
           const date = parseExcelDate(getColumnValue(row, ['Date', 'date']));
           const trainName = getColumnValue(row, ['Train Name', 'trainname', 'Train']) || '';
           const trainNumber = normalizeTrainNo(getColumnValue(row, ['Train Number', 'trainnumber', 'TrainNo']) || '');
           const master = getEffectiveMaster(trainNumber, trainName, date);
           if ((trainName || trainNumber) && !master) { skipped++; return; }
+          const salesEntry = master ? findSalesEntryForCash(date, master.id, master.trainNumber, master.trainName) : null;
+          if (!salesEntry) { skipped++; return; }
+          const gpFromSales = Math.round(Number(getColumnValue(row, ['Total Sale', 'totalsale', 'Amount To Be Collected', 'Amount To Collect']))) || Math.round(Number(salesEntry.salesAchievement || salesEntry.totalSale) || 0);
           
           const entry = {
             id: Date.now() + Math.random(),
@@ -6484,7 +6736,8 @@ function showPage(page) {
             businessHead: master?.businessHead || '',
             vp: master?.vp || '',
             gpFromSales: gpFromSales,
-            gpCollected: Math.round(Number(getColumnValue(row, ['GP Collected', 'gpcollected', 'CashCollected']))) || 0,
+            gpCollected: gpFromSales,
+            amountToCollect: gpFromSales,
             cashDepositCounter: cashDepositCounter,
             onlineDeposit: onlineDeposit,
             totalDeposit: cashDepositCounter + onlineDeposit,
@@ -6762,7 +7015,7 @@ function showPage(page) {
         'Yard': 'Howrah',
         'Train Name': 'Sample Express',
         'Train Number': '12345',
-        'GP Achievement': 50000,
+        'Total Sale': 50000,
         'Deposited in Cash': 30000,
         'Deposited through Online': 15000,
         'Shortage Reason': 'Cash Not Deposited',
@@ -6870,6 +7123,50 @@ function showPage(page) {
       const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
       XLSX.writeFile(wb, filename);
+    }
+
+    function ensurePrimarySuperAdminAction() {
+      if ((currentUser?.email || '').toLowerCase() !== 'sandipnandi2000@gmail.com') {
+        showAlert('Only primary super admin can use this download.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    async function downloadAllCode() {
+      if (!ensurePrimarySuperAdminAction()) return;
+      let code = '';
+      try {
+        const response = await fetch(location.href, { cache: 'no-store' });
+        if (response.ok) code = await response.text();
+      } catch (error) {
+        console.warn('Could not fetch source HTML, using current document HTML.', error);
+      }
+      if (!code) code = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      const blob = new Blob([code], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `index_full_code_${new Date().toISOString().split('T')[0]}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function downloadAllDataExcel() {
+      if (!ensurePrimarySuperAdminAction()) return;
+      const wb = XLSX.utils.book_new();
+      const addSheet = (name, data) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data || []), name.substring(0, 31));
+      addSheet('Users', appData.users);
+      addSheet('Train Managers', appData.trainMasters);
+      addSheet('Targets', appData.targetMasters);
+      addSheet('Sales', appData.sales);
+      addSheet('Complaints', appData.complaints);
+      addSheet('Cash Deposits', appData.cash);
+      addSheet('Yards', (appData.yards || []).map(name => ({ name })));
+      addSheet('Cluster Managers', (appData.clusterManagers || []).map(name => ({ name })));
+      addSheet('Train Manager Names', (appData.trainManagers || []).map(name => ({ name })));
+      addSheet('Rake Manager Names', (appData.rakeManagers || []).map(name => ({ name })));
+      XLSX.writeFile(wb, `rk_group_all_data_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
 
     function downloadBackup() {
@@ -7042,6 +7339,7 @@ function showPage(page) {
     window.showTrainDropdown = showTrainDropdown;
     window.selectTrain = selectTrain;
     window.calculateSalesPct = calculateSalesPct;
+    window.calculateSalesCostsAndGp = calculateSalesCostsAndGp;
     window.calculateGpPct = calculateGpPct;
     window.validateAndSaveSalesEntry = validateAndSaveSalesEntry;
     window.confirmGpApproval = confirmGpApproval;
@@ -7073,6 +7371,7 @@ function showPage(page) {
     window.deleteAllTargetMasters = deleteAllTargetMasters;
     window.clearMasterForm = clearMasterForm;
     window.editMasterRow = editMasterRow;
+    window.clearMasterTableFilters = clearMasterTableFilters;
     window.onMasterClusterChange = onMasterClusterChange;
     window.onMasterTrainManagerChange = onMasterTrainManagerChange;
     window.addYard = addYard;
@@ -7098,6 +7397,8 @@ function showPage(page) {
     window.downloadCashDashboardExcel = downloadCashDashboardExcel;
     window.downloadTableExcel = downloadTableExcel;
     window.downloadBackup = downloadBackup;
+    window.downloadAllCode = downloadAllCode;
+    window.downloadAllDataExcel = downloadAllDataExcel;
     window.restoreBackup = restoreBackup;
     window.resetAndImportSales = resetAndImportSales;
     window.syncToCloud = syncToCloud;
