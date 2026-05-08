@@ -2430,6 +2430,37 @@
     </div>
   </div>
 
+  <!-- Sales Reopen Approval Modal -->
+  <div id="salesReopenApprovalModal" class="modal-overlay">
+    <div class="modal gp-warning-modal">
+      <div class="gp-warning-icon">
+        <i class="fas fa-lock"></i>
+      </div>
+      <div class="gp-warning-text">
+        <p><strong>Cash deposit is already completed</strong></p>
+        <p style="font-size: 13px; margin-top: 6px;">Admin, Super Admin, or Ops Manager approval is required to reopen this sales entry.</p>
+      </div>
+      <div class="form-row">
+        <div class="form-field" style="grid-column: 1 / -1;">
+          <label>Approver ID / Email *</label>
+          <input type="text" id="salesReopenApproverId" placeholder="Enter approver ID or email">
+        </div>
+        <div class="form-field" style="grid-column: 1 / -1;">
+          <label>Password *</label>
+          <input type="password" id="salesReopenApproverPassword" placeholder="Enter password">
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button class="btn btn-warning" onclick="confirmSalesReopenApproval()" style="flex: 1;">
+          <i class="fas fa-unlock"></i> Approve Reopen
+        </button>
+        <button class="btn btn-secondary" onclick="closeSalesReopenApprovalModal()" style="flex: 1;">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- GP Warning Modal -->
   <div id="gpWarningModal" class="modal-overlay">
     <div class="modal gp-warning-modal">
@@ -2551,6 +2582,7 @@ console.log("✅ Connected to NEW Firebase");
     let chartFilter = { type: null, value: null };
     let compChartFilter = { type: null, value: null };
     let pendingSalesEntry = null;
+    let pendingSalesReopen = null;
     const MASTER_DELETE_KEY = 'RKRESET2026';
     const noDataPopupShown = { sales: false, complaints: false, cash: false };
 
@@ -4058,6 +4090,7 @@ function showPage(page) {
       document.getElementById('salesClusterManager').value = effective.clusterManager || '';
       document.getElementById('salesTrainManager').value = effective.trainManager || '';
       document.getElementById('salesRakeManager').value = effective.rakeManager || '';
+      checkExistingSalesForSelectedTrain();
       calculateSalesPct();
       calculateGpPct();
     }
@@ -5028,6 +5061,21 @@ function showPage(page) {
     }
 
     function renderPendingDepositTable(cashData, salesData) {
+      const table = document.getElementById('pendingDepositTable');
+      if (table) {
+        const headerRow = table.querySelector('thead tr');
+        if (headerRow) headerRow.innerHTML = `
+          <th>Train Manager</th>
+          <th>Rake Manager</th>
+          <th>Train</th>
+          <th>Train Number</th>
+          <th>Rake Number</th>
+          <th>Date</th>
+          <th>Amount To Collect</th>
+          <th>Total Deposited</th>
+          <th>Amount Pending</th>
+        `;
+      }
       const tbody = document.getElementById('pendingDepositTableBody');
       if (!tbody) return;
       const rows = salesData.map(s => {
@@ -5039,6 +5087,7 @@ function showPage(page) {
           rakeManager: latestCash?.rakeManager || s.rakeManager || 'Unassigned',
           trainManager: latestCash?.trainManager || s.trainManager || 'Unassigned',
           trainName: s.trainName || latestCash?.trainName || '-',
+          trainNumber: normalizeTrainNo(s.trainNumber || latestCash?.trainNumber) || s.trainNumber || latestCash?.trainNumber || '-',
           rakeNumber: latestCash?.rakeNumber || s.rakeNumber || '-',
           date: s.date || '',
           totalSale,
@@ -5048,16 +5097,17 @@ function showPage(page) {
       }).filter(r => r.pending > 0).sort((a, b) => b.pending - a.pending);
       tbody.innerHTML = rows.length ? rows.map(r => `
         <tr>
-          <td>${r.rakeManager}</td>
           <td>${r.trainManager}</td>
+          <td>${r.rakeManager}</td>
           <td>${r.trainName}</td>
+          <td>${r.trainNumber}</td>
           <td>${r.rakeNumber}</td>
           <td>${formatDate(r.date)}</td>
           <td>${formatCurrency(r.totalSale)}</td>
           <td>${formatCurrency(r.deposited)}</td>
           <td><strong>${formatCurrency(r.pending)}</strong></td>
         </tr>
-      `).join('') : '<tr><td colspan="8" style="text-align:center;color:#64748b;">No pending deposits for selected filters.</td></tr>';
+      `).join('') : '<tr><td colspan="9" style="text-align:center;color:#64748b;">No pending deposits for selected filters.</td></tr>';
     }
 
     function findSalesEntryForCash(date, trainId, trainNumber, trainName) {
@@ -5179,6 +5229,8 @@ function showPage(page) {
     function showTrainDropdown() { document.getElementById('trainDropdown').classList.add('active'); }
 
     function selectTrain(id, name, number) {
+      editingId = null;
+      editingType = null;
       document.getElementById('salesTrainId').value = id;
       document.getElementById('salesTrainSearch').value = name;
       document.getElementById('trainDropdown').classList.remove('active');
@@ -5202,6 +5254,118 @@ function showPage(page) {
       const achievement = Number(document.getElementById('salesAchievement').value) || 0;
       const pct = target > 0 ? Math.round((achievement / target) * 100) : 0;
       document.getElementById('salesAchievementPct').value = pct + '%';
+    }
+
+    function findSalesEntryByDateTrain(date, trainNumber, trainName, trainId = '') {
+      const day = getComparableDate(date);
+      return (appData.sales || []).find(s => getComparableDate(s.date) === day && (
+        (trainId && s.trainId && String(s.trainId) === String(trainId)) ||
+        buildTrainKey(s.trainNumber, s.trainName) === buildTrainKey(trainNumber, trainName)
+      ));
+    }
+
+    function getCashEntriesForSalesEntry(sale) {
+      if (!sale) return [];
+      return (appData.cash || []).filter(c => getComparableDate(c.date) === getComparableDate(sale.date) && isSameTrainForCashSale(c, sale));
+    }
+
+    function getCashDepositStatusForSale(sale) {
+      const amountToCollect = Number(sale?.amountToCollect || sale?.salesAchievement || sale?.totalSale) || 0;
+      const deposited = getCashEntriesForSalesEntry(sale).reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
+      return { amountToCollect, deposited, pending: Math.max(amountToCollect - deposited, 0), completed: amountToCollect > 0 && deposited >= amountToCollect };
+    }
+
+    function setSalesEntryFieldsDisabled(disabled) {
+      ['salesAchievement','salesStoreBill','salesBaseExpense','salesCreditExpense','salesCashExpense','salesMiscExpense','salesStaffSalary','salesManagerSalary','salesECatering','salesRemarks'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = disabled;
+      });
+    }
+
+    function loadSalesEntryIntoForm(entry, options = {}) {
+      editingId = entry.id;
+      editingType = 'sales';
+      document.getElementById('salesTrainId').value = entry.trainId || '';
+      document.getElementById('salesTrainSearch').value = entry.trainName || '';
+      document.getElementById('salesDate').value = entry.date || '';
+      document.getElementById('salesTrainNo').value = entry.trainNumber || '';
+      document.getElementById('salesYard').value = entry.yard || '';
+      document.getElementById('salesClusterManager').value = entry.clusterManager || '';
+      document.getElementById('salesTrainManager').value = entry.trainManager || '';
+      document.getElementById('salesRakeManager').value = entry.rakeManager || '';
+      document.getElementById('salesTrainType').value = entry.trainType || '';
+      document.getElementById('salesTarget').value = entry.salesTarget || '';
+      document.getElementById('salesAchievement').value = entry.salesAchievement || entry.totalSale || '';
+      document.getElementById('salesAchievementPct').value = entry.salesTarget > 0 ? Math.round((entry.salesAchievement / entry.salesTarget) * 100) + '%' : '0%';
+      document.getElementById('salesStoreBill').value = entry.storeBill || entry.rationExpense || '';
+      document.getElementById('salesBaseExpense').value = entry.baseExpense || '';
+      document.getElementById('salesCreditExpense').value = entry.creditExpense || '';
+      document.getElementById('salesCashExpense').value = entry.cashExpense || '';
+      document.getElementById('salesMiscExpense').value = entry.miscExpense || '';
+      document.getElementById('salesCashCommission').value = entry.cashCommission || Math.round((Number(entry.salesAchievement || entry.totalSale) || 0) * 0.10);
+      document.getElementById('salesStaffSalary').value = entry.staffSalary || '';
+      document.getElementById('salesManagerSalary').value = entry.managerSalary || '';
+      document.getElementById('salesECatering').value = entry.eCatering || '';
+      document.getElementById('salesGpTarget').value = entry.gpTarget || '';
+      document.getElementById('salesGpAchievement').value = entry.gpAchievement || '';
+      document.getElementById('salesGpAchievementPct').value = entry.gpTarget > 0 ? Math.round((entry.gpAchievement / entry.gpTarget) * 100) + '%' : '0%';
+      document.getElementById('salesRemarks').value = entry.remarks || '';
+      setSalesEntryFieldsDisabled(!!options.locked);
+    }
+
+    function userCanApproveSalesReopen(user) {
+      return !!user && ['admin', 'super_admin', 'ops_manager'].includes(user.role) && user.active !== false;
+    }
+
+    function requestSalesReopenApproval(entry) {
+      pendingSalesReopen = entry;
+      setSalesEntryFieldsDisabled(true);
+      document.getElementById('salesReopenApproverId').value = '';
+      document.getElementById('salesReopenApproverPassword').value = '';
+      document.getElementById('salesReopenApprovalModal').classList.add('active');
+    }
+
+    function confirmSalesReopenApproval() {
+      const id = document.getElementById('salesReopenApproverId').value.trim().toLowerCase();
+      const password = document.getElementById('salesReopenApproverPassword').value;
+      const approver = (appData.users || []).find(u => ((u.email || '').toLowerCase() === id || String(u.id) === id) && u.password === password && userCanApproveSalesReopen(u));
+      if (!approver) { showAlert('Approval failed. Use Admin, Super Admin, or Ops Manager ID/password.', 'error'); return; }
+      const idx = appData.sales.findIndex(s => s.id == pendingSalesReopen?.id);
+      if (idx >= 0) {
+        appData.sales[idx].salesReopenedAfterCash = true;
+        appData.sales[idx].salesReopenApprovedBy = approver.email || approver.name || approver.id;
+        appData.sales[idx].salesReopenApprovedAt = new Date().toISOString();
+        saveData();
+        loadSalesEntryIntoForm(appData.sales[idx], { locked: false });
+      }
+      closeSalesReopenApprovalModal();
+      showAlert('Sales entry reopened for editing.', 'success');
+    }
+
+    function closeSalesReopenApprovalModal() {
+      document.getElementById('salesReopenApprovalModal').classList.remove('active');
+      pendingSalesReopen = null;
+    }
+
+    function checkExistingSalesForSelectedTrain() {
+      const trainId = document.getElementById('salesTrainId')?.value;
+      const date = document.getElementById('salesDate')?.value;
+      if (!trainId || !date) return;
+      const train = (appData.trainMasters || []).find(t => t.id == trainId);
+      if (!train) return;
+      const existing = findSalesEntryByDateTrain(date, train.trainNumber, train.trainName, trainId);
+      if (!existing) {
+        if (editingType === 'sales') {
+          editingId = null;
+          editingType = null;
+        }
+        setSalesEntryFieldsDisabled(false);
+        return;
+      }
+      const cashStatus = getCashDepositStatusForSale(existing);
+      loadSalesEntryIntoForm(existing, { locked: cashStatus.completed });
+      showAlert(cashStatus.completed ? 'Sales entry already exists and cash deposit is completed. Approval required to edit.' : 'Sales entry already exists. Existing data loaded for editing.', cashStatus.completed ? 'warning' : 'info');
+      if (cashStatus.completed) requestSalesReopenApproval(existing);
     }
 
     function getCurrentSalesCostValues() {
@@ -5314,6 +5478,11 @@ function showPage(page) {
       const effectiveTrain = getEffectiveMaster(train.trainNumber, train.trainName, date, train.rakeManager, train.rakeNumber) || train;
       const duplicate = findDuplicateEntry(appData.sales, date, train.trainNumber, train.trainName, editingId);
       if (duplicate && !confirm('Sales data is already available for same train number and date. Overwrite existing entry?')) return;
+      const existingForEdit = editingId ? (appData.sales || []).find(s => s.id == editingId) : null;
+      if (existingForEdit && getCashDepositStatusForSale(existingForEdit).completed && !existingForEdit.salesReopenedAfterCash) {
+        requestSalesReopenApproval(existingForEdit);
+        return;
+      }
       const salesCosts = getCurrentSalesCostValues();
 
       const entry = {
@@ -5344,6 +5513,9 @@ function showPage(page) {
         managerSalary: Math.round(salesCosts.managerSalary),
         eCatering: Math.round(salesCosts.eCatering),
         amountToCollect: Math.round(salesCosts.amountToCollect),
+        salesReopenedAfterCash: existingForEdit?.salesReopenedAfterCash || false,
+        salesReopenApprovedBy: existingForEdit?.salesReopenApprovedBy || '',
+        salesReopenApprovedAt: existingForEdit?.salesReopenApprovedAt || '',
         gpTarget: getTrainGpTarget(train.trainNumber, train.trainName, date),
         gpAchievement: Math.round(Number(gpAchievement)),
         remarks: document.getElementById('salesRemarks').value
@@ -5370,6 +5542,8 @@ function showPage(page) {
       editingId = null;
       editingType = null;
       pendingSalesEntry = null;
+      pendingSalesReopen = null;
+      setSalesEntryFieldsDisabled(false);
       document.getElementById('salesTrainId').value = '';
       document.getElementById('salesTrainSearch').value = '';
       document.getElementById('salesTrainNo').value = '';
@@ -5448,31 +5622,9 @@ function showPage(page) {
       editingId = id;
       editingType = 'sales';
       
-      document.getElementById('salesTrainId').value = entry.trainId;
-      document.getElementById('salesTrainSearch').value = entry.trainName;
-      document.getElementById('salesDate').value = entry.date;
-      document.getElementById('salesTrainNo').value = entry.trainNumber;
-      document.getElementById('salesYard').value = entry.yard;
-      document.getElementById('salesClusterManager').value = entry.clusterManager || '';
-      document.getElementById('salesTrainManager').value = entry.trainManager || '';
-      document.getElementById('salesRakeManager').value = entry.rakeManager || '';
-      document.getElementById('salesTrainType').value = entry.trainType || '';
-      document.getElementById('salesTarget').value = entry.salesTarget;
-      document.getElementById('salesAchievement').value = entry.salesAchievement;
-      document.getElementById('salesAchievementPct').value = entry.salesTarget > 0 ? Math.round((entry.salesAchievement / entry.salesTarget) * 100) + '%' : '0%';
-      document.getElementById('salesStoreBill').value = entry.storeBill || entry.rationExpense || '';
-      document.getElementById('salesBaseExpense').value = entry.baseExpense || '';
-      document.getElementById('salesCreditExpense').value = entry.creditExpense || '';
-      document.getElementById('salesCashExpense').value = entry.cashExpense || '';
-      document.getElementById('salesMiscExpense').value = entry.miscExpense || '';
-      document.getElementById('salesCashCommission').value = entry.cashCommission || Math.round((Number(entry.salesAchievement) || 0) * 0.10);
-      document.getElementById('salesStaffSalary').value = entry.staffSalary || '';
-      document.getElementById('salesManagerSalary').value = entry.managerSalary || '';
-      document.getElementById('salesECatering').value = entry.eCatering || '';
-      document.getElementById('salesGpTarget').value = entry.gpTarget;
-      document.getElementById('salesGpAchievement').value = entry.gpAchievement;
-      document.getElementById('salesGpAchievementPct').value = entry.gpTarget > 0 ? Math.round((entry.gpAchievement / entry.gpTarget) * 100) + '%' : '0%';
-      document.getElementById('salesRemarks').value = entry.remarks || '';
+      const cashStatus = getCashDepositStatusForSale(entry);
+      loadSalesEntryIntoForm(entry, { locked: cashStatus.completed && !entry.salesReopenedAfterCash });
+      if (cashStatus.completed && !entry.salesReopenedAfterCash) requestSalesReopenApproval(entry);
 
       switchSalesTab('entry');
     }
@@ -5942,6 +6094,14 @@ function showPage(page) {
       if (!ensureEditable('edit entries')) return;
       const c = appData.cash.find(x => x.id == id);
       if (!c) return;
+      const relatedSale = findSalesEntryForCash(c.date, c.trainId, c.trainNumber, c.trainName);
+      const amountToCollect = Number(c.amountToCollect || c.gpFromSales || c.gpCollected) || Number(relatedSale?.amountToCollect || relatedSale?.salesAchievement || relatedSale?.totalSale) || 0;
+      const pending = Math.max(amountToCollect - (Number(c.totalDeposit) || 0), 0);
+      const completed = amountToCollect > 0 && (Number(c.totalDeposit) || 0) >= amountToCollect;
+      if (completed && !relatedSale?.salesReopenedAfterCash) {
+        showAlert('Cash deposit is completed. It can be edited only after the related sales entry is reopened/edited.', 'warning');
+        return;
+      }
 
       editingId = id;
       editingType = 'cash';
@@ -7404,6 +7564,8 @@ function showPage(page) {
     window.validateAndSaveSalesEntry = validateAndSaveSalesEntry;
     window.confirmGpApproval = confirmGpApproval;
     window.closeGpWarningModal = closeGpWarningModal;
+    window.confirmSalesReopenApproval = confirmSalesReopenApproval;
+    window.closeSalesReopenApprovalModal = closeSalesReopenApprovalModal;
     window.clearSalesForm = clearSalesForm;
     window.editSalesEntry = editSalesEntry;
     window.deleteSalesEntry = deleteSalesEntry;
