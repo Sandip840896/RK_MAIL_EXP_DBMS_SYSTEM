@@ -1233,15 +1233,27 @@
 
               <div class="form-row">
                 <div class="form-field">
-                  <label>Ration Expense</label>
-                  <input type="number" id="salesRationExpense" oninput="calculateSalesCostsAndGp()">
+                  <label>Store Bill</label>
+                  <input type="number" id="salesStoreBill" oninput="calculateSalesCostsAndGp()">
                 </div>
                 <div class="form-field">
-                  <label>MISC Expense</label>
+                  <label>Base Expenses</label>
+                  <input type="number" id="salesBaseExpense" oninput="calculateSalesCostsAndGp()">
+                </div>
+                <div class="form-field">
+                  <label>Credit Expenses</label>
+                  <input type="number" id="salesCreditExpense" oninput="calculateSalesCostsAndGp()">
+                </div>
+                <div class="form-field">
+                  <label>Cash Expenses</label>
+                  <input type="number" id="salesCashExpense" oninput="calculateSalesCostsAndGp()">
+                </div>
+                <div class="form-field">
+                  <label>MISC Expenses</label>
                   <input type="number" id="salesMiscExpense" oninput="calculateSalesCostsAndGp()">
                 </div>
                 <div class="form-field">
-                  <label>Cash Commission (10%)</label>
+                  <label>Commission (10% Of Sales)</label>
                   <input type="number" id="salesCashCommission" readonly>
                 </div>
                 <div class="form-field">
@@ -1251,6 +1263,10 @@
                 <div class="form-field">
                   <label>Manager Salary</label>
                   <input type="number" id="salesManagerSalary" oninput="calculateSalesCostsAndGp()">
+                </div>
+                <div class="form-field">
+                  <label>E-Catering</label>
+                  <input type="number" id="salesECatering" oninput="calculateSalesCostsAndGp()">
                 </div>
               </div>
 
@@ -5017,7 +5033,7 @@ function showPage(page) {
       const rows = salesData.map(s => {
         const matchingDeposits = cashData.filter(c => getComparableDate(c.date) === getComparableDate(s.date) && isSameTrainForCashSale(c, s));
         const deposited = matchingDeposits.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
-        const totalSale = Number(s.salesAchievement || s.totalSale) || 0;
+        const totalSale = Number(s.amountToCollect || s.salesAchievement || s.totalSale) || 0;
         const latestCash = matchingDeposits.sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0];
         return {
           rakeManager: latestCash?.rakeManager || s.rakeManager || 'Unassigned',
@@ -5067,7 +5083,7 @@ function showPage(page) {
       const trainName = document.getElementById('cashTrainSearch')?.value || '';
       const salesEntry = date && (trainId || trainNumber || trainName) ? findSalesEntryForCash(date, trainId, trainNumber, trainName) : null;
       if (salesEntry) {
-        document.getElementById('cashGpFromSales').value = Number(salesEntry.salesAchievement || salesEntry.totalSale) || 0;
+        document.getElementById('cashGpFromSales').value = Number(salesEntry.amountToCollect || salesEntry.salesAchievement || salesEntry.totalSale) || 0;
         document.getElementById('cashTrainManager').value = salesEntry.trainManager || '';
         document.getElementById('cashRakeManager').value = salesEntry.rakeManager || '';
         if (salesEntry.yard) document.getElementById('cashYard').value = salesEntry.yard;
@@ -5188,17 +5204,28 @@ function showPage(page) {
       document.getElementById('salesAchievementPct').value = pct + '%';
     }
 
-    function calculateSalesCostsAndGp() {
+    function getCurrentSalesCostValues() {
       const totalSale = Number(document.getElementById('salesAchievement')?.value) || 0;
-      const ration = Number(document.getElementById('salesRationExpense')?.value) || 0;
-      const misc = Number(document.getElementById('salesMiscExpense')?.value) || 0;
+      const storeBill = Number(document.getElementById('salesStoreBill')?.value) || 0;
+      const baseExpense = Number(document.getElementById('salesBaseExpense')?.value) || 0;
+      const creditExpense = Number(document.getElementById('salesCreditExpense')?.value) || 0;
+      const cashExpense = Number(document.getElementById('salesCashExpense')?.value) || 0;
+      const miscExpense = Number(document.getElementById('salesMiscExpense')?.value) || 0;
       const commission = Math.round(totalSale * 0.10);
-      const staff = Number(document.getElementById('salesStaffSalary')?.value) || 0;
-      const manager = Number(document.getElementById('salesManagerSalary')?.value) || 0;
+      const staffSalary = Number(document.getElementById('salesStaffSalary')?.value) || 0;
+      const managerSalary = Number(document.getElementById('salesManagerSalary')?.value) || 0;
+      const eCatering = Number(document.getElementById('salesECatering')?.value) || 0;
+      const gpAchievement = Math.round(totalSale - (storeBill + baseExpense + creditExpense + cashExpense + miscExpense + commission + staffSalary + managerSalary));
+      const amountToCollect = Math.round((gpAchievement + storeBill + baseExpense + creditExpense + managerSalary) - eCatering);
+      return { totalSale, storeBill, baseExpense, creditExpense, cashExpense, miscExpense, commission, staffSalary, managerSalary, eCatering, gpAchievement, amountToCollect };
+    }
+
+    function calculateSalesCostsAndGp() {
+      const values = getCurrentSalesCostValues();
       const commissionInput = document.getElementById('salesCashCommission');
-      if (commissionInput) commissionInput.value = commission;
+      if (commissionInput) commissionInput.value = values.commission;
       const gpInput = document.getElementById('salesGpAchievement');
-      if (gpInput) gpInput.value = Math.round(totalSale - (ration + misc + commission + staff + manager));
+      if (gpInput) gpInput.value = values.gpAchievement;
       calculateSalesPct();
       calculateGpPct();
     }
@@ -5287,6 +5314,7 @@ function showPage(page) {
       const effectiveTrain = getEffectiveMaster(train.trainNumber, train.trainName, date, train.rakeManager, train.rakeNumber) || train;
       const duplicate = findDuplicateEntry(appData.sales, date, train.trainNumber, train.trainName, editingId);
       if (duplicate && !confirm('Sales data is already available for same train number and date. Overwrite existing entry?')) return;
+      const salesCosts = getCurrentSalesCostValues();
 
       const entry = {
         id: editingId || Date.now(),
@@ -5306,11 +5334,16 @@ function showPage(page) {
         salesTarget: getTrainSalesTarget(train.trainNumber, train.trainName, date),
         salesAchievement: Math.round(Number(salesAchievement)),
         totalSale: Math.round(Number(salesAchievement)),
-        rationExpense: Math.round(Number(document.getElementById('salesRationExpense')?.value) || 0),
-        miscExpense: Math.round(Number(document.getElementById('salesMiscExpense')?.value) || 0),
-        cashCommission: Math.round(Number(document.getElementById('salesCashCommission')?.value) || 0),
-        staffSalary: Math.round(Number(document.getElementById('salesStaffSalary')?.value) || 0),
-        managerSalary: Math.round(Number(document.getElementById('salesManagerSalary')?.value) || 0),
+        storeBill: Math.round(salesCosts.storeBill),
+        baseExpense: Math.round(salesCosts.baseExpense),
+        creditExpense: Math.round(salesCosts.creditExpense),
+        cashExpense: Math.round(salesCosts.cashExpense),
+        miscExpense: Math.round(salesCosts.miscExpense),
+        cashCommission: Math.round(salesCosts.commission),
+        staffSalary: Math.round(salesCosts.staffSalary),
+        managerSalary: Math.round(salesCosts.managerSalary),
+        eCatering: Math.round(salesCosts.eCatering),
+        amountToCollect: Math.round(salesCosts.amountToCollect),
         gpTarget: getTrainGpTarget(train.trainNumber, train.trainName, date),
         gpAchievement: Math.round(Number(gpAchievement)),
         remarks: document.getElementById('salesRemarks').value
@@ -5348,11 +5381,15 @@ function showPage(page) {
       document.getElementById('salesTarget').value = '';
       document.getElementById('salesAchievement').value = '';
       document.getElementById('salesAchievementPct').value = '';
-      document.getElementById('salesRationExpense').value = '';
+      document.getElementById('salesStoreBill').value = '';
+      document.getElementById('salesBaseExpense').value = '';
+      document.getElementById('salesCreditExpense').value = '';
+      document.getElementById('salesCashExpense').value = '';
       document.getElementById('salesMiscExpense').value = '';
       document.getElementById('salesCashCommission').value = '';
       document.getElementById('salesStaffSalary').value = '';
       document.getElementById('salesManagerSalary').value = '';
+      document.getElementById('salesECatering').value = '';
       document.getElementById('salesGpTarget').value = '';
       document.getElementById('salesGpAchievement').value = '';
       document.getElementById('salesGpAchievementPct').value = '';
@@ -5423,11 +5460,15 @@ function showPage(page) {
       document.getElementById('salesTarget').value = entry.salesTarget;
       document.getElementById('salesAchievement').value = entry.salesAchievement;
       document.getElementById('salesAchievementPct').value = entry.salesTarget > 0 ? Math.round((entry.salesAchievement / entry.salesTarget) * 100) + '%' : '0%';
-      document.getElementById('salesRationExpense').value = entry.rationExpense || '';
+      document.getElementById('salesStoreBill').value = entry.storeBill || entry.rationExpense || '';
+      document.getElementById('salesBaseExpense').value = entry.baseExpense || '';
+      document.getElementById('salesCreditExpense').value = entry.creditExpense || '';
+      document.getElementById('salesCashExpense').value = entry.cashExpense || '';
       document.getElementById('salesMiscExpense').value = entry.miscExpense || '';
       document.getElementById('salesCashCommission').value = entry.cashCommission || Math.round((Number(entry.salesAchievement) || 0) * 0.10);
       document.getElementById('salesStaffSalary').value = entry.staffSalary || '';
       document.getElementById('salesManagerSalary').value = entry.managerSalary || '';
+      document.getElementById('salesECatering').value = entry.eCatering || '';
       document.getElementById('salesGpTarget').value = entry.gpTarget;
       document.getElementById('salesGpAchievement').value = entry.gpAchievement;
       document.getElementById('salesGpAchievementPct').value = entry.gpTarget > 0 ? Math.round((entry.gpAchievement / entry.gpTarget) * 100) + '%' : '0%';
@@ -6568,13 +6609,18 @@ function showPage(page) {
           const trainNumber = getColumnValue(row, ['Train Number', 'trainnumber', 'trainno', 'TrainNo']);
           const dateValue = getColumnValue(row, ['Arrival Date', 'arrivaldate', 'date', 'Date']);
           const salesAchievement = Number(getColumnValue(row, ['Total Sale', 'totalsale', 'Sales Achievement', 'salesachievement', 'achievement'])) || 0;
-          const rationExpense = Math.round(Number(getColumnValue(row, ['Ration Expense', 'rationexpense']))) || 0;
-          const miscExpense = Math.round(Number(getColumnValue(row, ['MISC Expense', 'miscexpense', 'Misc Expense']))) || 0;
-          const cashCommission = Math.round(Number(getColumnValue(row, ['Cash Commission', 'cashcommission']))) || Math.round(salesAchievement * 0.10);
+          const storeBill = Math.round(Number(getColumnValue(row, ['Store Bill', 'storebill', 'Ration Expense', 'rationexpense']))) || 0;
+          const baseExpense = Math.round(Number(getColumnValue(row, ['Base Expenses', 'baseexpenses', 'Base Expense']))) || 0;
+          const creditExpense = Math.round(Number(getColumnValue(row, ['Credit Expenses', 'creditexpenses', 'Credit Expense']))) || 0;
+          const cashExpense = Math.round(Number(getColumnValue(row, ['Cash Expenses', 'cashexpenses', 'Cash Expense']))) || 0;
+          const miscExpense = Math.round(Number(getColumnValue(row, ['MISC Expenses', 'MISC Expense', 'miscexpense', 'Misc Expense']))) || 0;
+          const cashCommission = Math.round(Number(getColumnValue(row, ['Commission', 'Cash Commission', 'cashcommission']))) || Math.round(salesAchievement * 0.10);
           const staffSalary = Math.round(Number(getColumnValue(row, ['Staff Salary', 'staffsalary']))) || 0;
           const managerSalary = Math.round(Number(getColumnValue(row, ['Manager Salary', 'managersalary']))) || 0;
+          const eCatering = Math.round(Number(getColumnValue(row, ['E-Catering', 'ECatering', 'eCatering']))) || 0;
           const importedGp = Number(getColumnValue(row, ['Gross Profit Achievement', 'grossprofitachievement', 'gpachievement'])) || 0;
-          const gpAchievement = importedGp || (salesAchievement - (rationExpense + miscExpense + cashCommission + staffSalary + managerSalary));
+          const gpAchievement = importedGp || (salesAchievement - (storeBill + baseExpense + creditExpense + cashExpense + miscExpense + cashCommission + staffSalary + managerSalary));
+          const amountToCollect = Math.round((gpAchievement + storeBill + baseExpense + creditExpense + managerSalary) - eCatering);
 
           let parsedDate = parseExcelDate(dateValue);
 
@@ -6605,11 +6651,16 @@ function showPage(page) {
             salesTarget: getTrainSalesTarget(stableTrainNo, trainName, parsedDate),
             salesAchievement: Math.round(salesAchievement),
             totalSale: Math.round(salesAchievement),
-            rationExpense,
+            storeBill,
+            baseExpense,
+            creditExpense,
+            cashExpense,
             miscExpense,
             cashCommission,
             staffSalary,
             managerSalary,
+            eCatering,
+            amountToCollect,
             gpTarget: getTrainGpTarget(stableTrainNo, trainName, parsedDate),
             gpAchievement: Math.round(gpAchievement),
             remarks: 'Imported from Excel'
@@ -6977,8 +7028,17 @@ function showPage(page) {
         'Train Number': '12345',
         'Arrival Date': new Date().toISOString().split('T')[0],
         'Train Name': 'Sample Express',
-        'Sales Achievement': 95000,
-        'Gross Profit Achievement': 42000
+        'Total Sale': 95000,
+        'Store Bill': 12000,
+        'Base Expenses': 8000,
+        'Credit Expenses': 2000,
+        'Cash Expenses': 3000,
+        'MISC Expenses': 1500,
+        'Commission': 9500,
+        'Staff Salary': 5000,
+        'Manager Salary': 4000,
+        'E-Catering': 1000,
+        'Gross Profit Achievement': 50000
       }];
       downloadExcel(data, 'sales_import_sample.xlsx');
     }
