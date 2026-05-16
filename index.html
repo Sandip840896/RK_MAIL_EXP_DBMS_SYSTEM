@@ -1095,6 +1095,34 @@
             </div>
           </div>
 
+          <!-- Repeat Customer Table -->
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">Repeat Complaint Mobile Numbers</h3>
+                <p class="card-subtitle">Click a mobile number row to filter the dashboard to that customer.</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('repeatComplaintTable', 'repeat_complaint_mobile_numbers')">
+                <i class="fas fa-file-excel"></i>
+              </button>
+            </div>
+            <div class="table-container">
+              <table id="repeatComplaintTable">
+                <thead>
+                  <tr>
+                    <th>Mobile</th>
+                    <th>Total</th>
+                    <th>Open/In Progress</th>
+                    <th>Latest Date</th>
+                    <th>Latest Train</th>
+                    <th>Latest Nature</th>
+                  </tr>
+                </thead>
+                <tbody id="repeatComplaintTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- Comparison Tables -->
           <div class="grid grid-2" style="margin-top: 16px;">
             <div class="card">
@@ -1367,6 +1395,9 @@
                 <button class="btn btn-ghost btn-sm" onclick="downloadComplaintSample()">
                   <i class="fas fa-download"></i> Sample
                 </button>
+                <button class="btn btn-ghost btn-sm" onclick="downloadComplaintEntryReport()">
+                  <i class="fas fa-file-excel"></i> Entry Report
+                </button>
               </div>
             </div>
 
@@ -1386,8 +1417,9 @@
                   <input type="text" id="complaintId" placeholder="Auto-generated if empty">
                 </div>
                 <div class="form-field">
-                  <label>Source *</label>
+                  <label>Source</label>
                   <select id="complaintSource">
+                    <option value="">Select Source</option>
                     <option>Helpline-139</option>
                     <option>IRCTC App</option>
                     <option>Email</option>
@@ -1456,59 +1488,90 @@
 
               <div class="form-row">
                 <div class="form-field">
-                  <label>Complainant Name *</label>
-                  <input type="text" id="complaintName">
+                  <label>Complainant Details</label>
+                  <input type="text" id="complaintName" placeholder="Passenger/customer name or details">
                 </div>
                 <div class="form-field">
-                  <label>Mobile Number</label>
-                  <input type="text" id="complaintMobile">
+                  <label>Email</label>
+                  <input type="email" id="complaintEmail" placeholder="Optional">
                 </div>
                 <div class="form-field">
-                  <label>PNR Number</label>
+                  <label>Mobile Number *</label>
+                  <input type="text" id="complaintMobile" placeholder="Example: 7278061588" onblur="checkPreviousComplaintsByMobile()">
+                </div>
+                <div class="form-field">
+                  <label>Reference No *</label>
+                  <input type="text" id="complaintReferenceNo">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-field">
+                  <label>PNR / UTS Number *</label>
                   <input type="text" id="complaintPnr">
                 </div>
                 <div class="form-field">
-                  <label>Complaint Type *</label>
-                  <select id="complaintType">
-                    <option value="">Select Type</option>
-                    <option>Overcharging</option>
-                    <option>Food Quality</option>
-                    <option>Service Issue</option>
-                    <option>Cleanliness</option>
-                    <option>Staff Behavior</option>
-                    <option>Availability</option>
-                    <option>Other</option>
-                  </select>
+                  <label>Coach No. *</label>
+                  <input type="text" id="complaintCoachNo">
+                </div>
+                <div class="form-field">
+                  <label>Physical Coach No.</label>
+                  <input type="number" id="complaintPhysicalCoachNo">
+                </div>
+                <div class="form-field">
+                  <label>Berth No.</label>
+                  <input type="text" id="complaintBerthNo" placeholder="Example: 34">
+                </div>
+                <div class="form-field">
+                  <label>Train Commencement Date & Time</label>
+                  <input type="datetime-local" id="complaintCommencementDateTime">
                 </div>
               </div>
 
               <div class="form-row">
-                <div class="form-field" style="grid-column: 1 / -1;">
+                <div class="form-field">
                   <label>Complaint Nature *</label>
                   <select id="complaintNature">
                     <option value="">Select Nature</option>
-                    <option>Food Quality - Stale Food</option>
-                    <option>Food Quality - Taste Issue</option>
-                    <option>Food Quality - Wrong Item</option>
-                    <option>Service - Delayed Service</option>
-                    <option>Service - Unavailable Items</option>
-                    <option>Service - Wrong Order</option>
-                    <option>Billing - Overcharged</option>
-                    <option>Billing - No Bill Provided</option>
-                    <option>Cleanliness - Unhygienic</option>
-                    <option>Cleanliness - Pest Issue</option>
-                    <option>Staff Behavior - Rude</option>
-                    <option>Staff Behavior - Unprofessional</option>
-                    <option>Other</option>
+                    <option>Expiry Items</option>
+                    <option>Foreign Particle</option>
+                    <option>Generic Choice</option>
+                    <option>Hygiene</option>
+                    <option>Late Service</option>
+                    <option>Misbehavior</option>
+                    <option>misc</option>
+                    <option>No Bill provided</option>
+                    <option>Others</option>
+                    <option>Overcharging</option>
+                    <option>Policy</option>
+                    <option>Quality</option>
+                    <option>Quantity</option>
+                    <option>Query</option>
+                    <option>Railneer Short</option>
+                    <option>Service</option>
+                    <option>Unauthorized Water</option>
+                    <option>Unauthorized Food</option>
                   </select>
+                </div>
+                <div class="form-field">
+                  <label>Complaint Type</label>
+                  <input type="text" id="complaintType" placeholder="Optional">
                 </div>
               </div>
 
               <div class="form-row">
                 <div class="form-field" style="grid-column: 1 / -1;">
-                  <label>Complaint Details</label>
+                  <label>Complaint Description *</label>
                   <textarea id="complaintDetails" rows="3"></textarea>
                 </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-field"><label>Action Taken 1</label><textarea id="complaintAction1" rows="2" placeholder="Customer/train manager discussion"></textarea></div>
+                <div class="form-field"><label>Action Taken 2</label><textarea id="complaintAction2" rows="2"></textarea></div>
+                <div class="form-field"><label>Action Taken 3</label><textarea id="complaintAction3" rows="2"></textarea></div>
+                <div class="form-field"><label>Action Taken 4</label><textarea id="complaintAction4" rows="2"></textarea></div>
+                <div class="form-field"><label>Action Taken 5</label><textarea id="complaintAction5" rows="2"></textarea></div>
               </div>
 
               <div class="form-row">
@@ -1541,6 +1604,8 @@
                         <th>Date</th>
                         <th>ID</th>
                         <th>Train</th>
+                        <th>Mobile</th>
+                        <th>Reference No</th>
                         <th>Nature</th>
                         <th>Status</th>
                         <th>Action</th>
@@ -1588,13 +1653,15 @@
                 <table id="complaintTable">
                   <thead>
                     <tr>
-                      <th>Date</th>
-                      <th>ID</th>
-                      <th>Train</th>
-                      <th>Nature</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
+                        <th>Date</th>
+                        <th>ID</th>
+                        <th>Train</th>
+                        <th>Mobile</th>
+                        <th>Reference No</th>
+                        <th>Nature</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
                   </thead>
                   <tbody id="complaintTableBody"></tbody>
                 </table>
@@ -2419,6 +2486,17 @@
     </main>
   </div>
 
+  <!-- Previous Complaints Modal -->
+  <div id="previousComplaintsModal" class="modal-overlay">
+    <div class="modal" style="max-width: 760px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="previousComplaintsTitle">Previous Complaints</h3>
+        <button class="modal-close" onclick="closePreviousComplaintsModal()">&times;</button>
+      </div>
+      <div id="previousComplaintsContent"></div>
+    </div>
+  </div>
+
   <!-- Modal for editing -->
   <div id="editModal" class="modal-overlay">
     <div class="modal">
@@ -2557,18 +2635,27 @@ console.log("✅ Connected to NEW Firebase");
 
     // Complaint nature categories for analysis
     const COMPLAINT_NATURE_CATEGORIES = {
-      'Food Quality - Stale Food': 'Food Quality',
-      'Food Quality - Taste Issue': 'Food Quality',
-      'Food Quality - Wrong Item': 'Food Quality',
-      'Service - Delayed Service': 'Service',
-      'Service - Unavailable Items': 'Service',
-      'Service - Wrong Order': 'Service',
-      'Billing - Overcharged': 'Billing',
-      'Billing - No Bill Provided': 'Billing',
-      'Cleanliness - Unhygienic': 'Cleanliness',
-      'Cleanliness - Pest Issue': 'Cleanliness',
-      'Staff Behavior - Rude': 'Staff Behavior',
-      'Staff Behavior - Unprofessional': 'Staff Behavior',
+      'Expiry Items': 'Quality',
+      'Foreign Particle': 'Quality',
+      'Generic Choice': 'Other',
+      'Hygiene': 'Cleanliness',
+      'Late Service': 'Service',
+      'Misbehavior': 'Staff Behavior',
+      'misc': 'Other',
+      'No Bill provided': 'Billing',
+      'Others': 'Other',
+      'Overcharging': 'Billing',
+      'Policy': 'Policy',
+      'Quality': 'Quality',
+      'Quantity': 'Quantity',
+      'Query': 'Query',
+      'Railneer Short': 'Railneer',
+      'Service': 'Service',
+      'Unauthorized Water': 'Unauthorized',
+      'Unauthorized Food': 'Unauthorized',
+      'Food Quality - Stale Food': 'Quality',
+      'Food Quality - Taste Issue': 'Quality',
+      'Food Quality - Wrong Item': 'Quality',
       'Other': 'Other'
     };
 
@@ -3212,6 +3299,7 @@ function showPage(page) {
         if (compChartFilter.type === 'train') filtered = filtered.filter(c => c.trainName === compChartFilter.value);
         if (compChartFilter.type === 'status') filtered = filtered.filter(c => c.status === compChartFilter.value);
         if (compChartFilter.type === 'source') filtered = filtered.filter(c => c.source === compChartFilter.value);
+        if (compChartFilter.type === 'mobile') filtered = filtered.filter(c => normalizeMobileNo(c.mobileNo) === normalizeMobileNo(compChartFilter.value));
         if (compChartFilter.type === 'date') filtered = filtered.filter(c => c.date === compChartFilter.value);
       }
 
@@ -4201,6 +4289,7 @@ function showPage(page) {
       renderNatureAnalysisChart(complaintsP1, complaintsP2);
 
       renderTopTrainsTable(complaintsP1, complaintsP2);
+      renderRepeatComplainantTable(complaintsP1);
       
       renderComplaintComparisonTables(complaintsP1, complaintsP2);
       updateCompChartFilterDisplay();
@@ -4718,6 +4807,41 @@ function showPage(page) {
           }
         }
       });
+    }
+
+
+    function renderRepeatComplainantTable(complaints) {
+      const tbody = document.getElementById('repeatComplaintTableBody');
+      if (!tbody) return;
+
+      const grouped = {};
+      (complaints || []).forEach(c => {
+        const mobile = normalizeMobileNo(c.mobileNo);
+        if (!mobile) return;
+        if (!grouped[mobile]) grouped[mobile] = [];
+        grouped[mobile].push(c);
+      });
+
+      const rows = Object.entries(grouped)
+        .map(([mobile, list]) => {
+          const sorted = list.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+          const latest = sorted[0] || {};
+          const openCount = list.filter(c => c.status === 'Open' || c.status === 'In Progress').length;
+          return { mobile, count: list.length, openCount, latest };
+        })
+        .sort((a, b) => b.count - a.count || new Date(b.latest.date || 0) - new Date(a.latest.date || 0))
+        .slice(0, 20);
+
+      tbody.innerHTML = rows.length ? rows.map(r => `
+        <tr style="cursor:pointer;" onclick="applyComplaintFilter('mobile', encodeURIComponent('${r.mobile}'))">
+          <td>${r.mobile}</td>
+          <td>${r.count}</td>
+          <td>${r.openCount}</td>
+          <td>${formatDate(r.latest.date)}</td>
+          <td>${r.latest.trainName || '-'}</td>
+          <td>${r.latest.complainNature || '-'}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="6" style="text-align:center;color:#64748b;">No mobile number data in this period</td></tr>';
     }
 
     function renderTopTrainsTable(current, prev) {
@@ -5716,8 +5840,10 @@ function showPage(page) {
     }
 
     function switchComplaintTab(tab) {
-      document.querySelectorAll('#page-complaints .tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
+      const tabs = document.querySelectorAll('#page-complaints .tab');
+      tabs.forEach(t => t.classList.remove('active'));
+      const index = tab === 'list' ? 1 : 0;
+      if (tabs[index]) tabs[index].classList.add('active');
       document.getElementById('complaintEntryTab').classList.toggle('hidden', tab !== 'entry');
       document.getElementById('complaintListTab').classList.toggle('hidden', tab !== 'list');
       if (tab === 'list') loadComplaintList();
@@ -5729,8 +5855,16 @@ function showPage(page) {
       const trainName = document.getElementById('complaintTrainName').value;
       const nature = document.getElementById('complaintNature').value;
       const rakeManager = document.getElementById('complaintRakeManager').value;
+      const mobileNo = document.getElementById('complaintMobile').value.trim();
+      const referenceNo = document.getElementById('complaintReferenceNo').value.trim();
+      const pnrNo = document.getElementById('complaintPnr').value.trim();
+      const coachNo = document.getElementById('complaintCoachNo').value.trim();
+      const details = document.getElementById('complaintDetails').value.trim();
 
-      if (!date || !trainName || !rakeManager || !nature) { showAlert('Please fill all required fields including Rake Manager', 'error'); return; }
+      if (!date || !trainName || !rakeManager || !nature || !mobileNo || !referenceNo || !pnrNo || !coachNo || !details) {
+        showAlert('Please fill mandatory fields: train, rake manager, mobile, reference no, PNR/UTS, coach no, nature and description.', 'error');
+        return;
+      }
 
       const isEdit = editingId && editingType === 'complaint';
       const trainNoForComplaint = document.getElementById('complaintTrainNo').value;
@@ -5754,11 +5888,22 @@ function showPage(page) {
         businessHead: document.getElementById('complaintBusinessHead').value || effective?.businessHead || '',
         vp: document.getElementById('complaintVp').value || effective?.vp || '',
         complainantName: document.getElementById('complaintName').value,
-        mobileNo: document.getElementById('complaintMobile').value,
-        pnrNo: document.getElementById('complaintPnr').value,
+        email: document.getElementById('complaintEmail').value,
+        mobileNo: mobileNo,
+        referenceNo: referenceNo,
+        pnrNo: pnrNo,
+        coachNo: coachNo,
+        physicalCoachNo: document.getElementById('complaintPhysicalCoachNo').value,
+        berthNo: document.getElementById('complaintBerthNo').value,
+        commencementDateTime: document.getElementById('complaintCommencementDateTime').value,
         complaintType: document.getElementById('complaintType').value,
         complainNature: nature,
-        details: document.getElementById('complaintDetails').value,
+        details: details,
+        actionTaken1: document.getElementById('complaintAction1').value,
+        actionTaken2: document.getElementById('complaintAction2').value,
+        actionTaken3: document.getElementById('complaintAction3').value,
+        actionTaken4: document.getElementById('complaintAction4').value,
+        actionTaken5: document.getElementById('complaintAction5').value,
         remarks: document.getElementById('complaintRemarks').value
       };
 
@@ -5798,11 +5943,18 @@ function showPage(page) {
       document.getElementById('complaintBusinessHead').value = '';
       document.getElementById('complaintVp').value = '';
       document.getElementById('complaintName').value = '';
+      document.getElementById('complaintEmail').value = '';
       document.getElementById('complaintMobile').value = '';
+      document.getElementById('complaintReferenceNo').value = '';
       document.getElementById('complaintPnr').value = '';
+      document.getElementById('complaintCoachNo').value = '';
+      document.getElementById('complaintPhysicalCoachNo').value = '';
+      document.getElementById('complaintBerthNo').value = '';
+      document.getElementById('complaintCommencementDateTime').value = '';
       document.getElementById('complaintType').value = '';
       document.getElementById('complaintNature').value = '';
       document.getElementById('complaintDetails').value = '';
+      ['complaintAction1','complaintAction2','complaintAction3','complaintAction4','complaintAction5'].forEach(id => document.getElementById(id).value = '');
       document.getElementById('complaintRemarks').value = '';
     }
 
@@ -5834,6 +5986,8 @@ function showPage(page) {
           <td>${formatDate(c.date)}</td>
           <td>${c.complaintId}</td>
           <td>${c.trainName}</td>
+          <td>${c.mobileNo || '-'}</td>
+          <td>${c.referenceNo || '-'}</td>
           <td><span class="nature-tag nature-${getNatureCategory(c.complainNature)}">${c.complainNature}</span></td>
           <td><span class="badge badge-${c.status === 'Open' ? 'danger' : c.status === 'In Progress' ? 'warning' : 'success'}">${c.status}</span></td>
           <td>
@@ -5854,11 +6008,50 @@ function showPage(page) {
           <td>${formatDate(c.date)}</td>
           <td>${c.complaintId || '-'}</td>
           <td>${c.trainName || '-'}</td>
+          <td>${c.mobileNo || '-'}</td>
+          <td>${c.referenceNo || '-'}</td>
           <td>${c.complainNature || c.complaintType || '-'}</td>
           <td><span class="badge badge-${c.status === 'Open' ? 'danger' : 'warning'}">${c.status}</span></td>
           <td>${isReadOnlyUser() ? '<span style="font-size:11px;color:#64748b;">View only</span>' : `<button class="btn-icon edit" onclick="editComplaint(${c.id})"><i class="fas fa-edit"></i></button>`}</td>
         </tr>
       `).join('');
+    }
+
+    function normalizeMobileNo(value) {
+      return String(value || '').replace(/\D/g, '');
+    }
+
+    function checkPreviousComplaintsByMobile() {
+      const mobile = normalizeMobileNo(document.getElementById('complaintMobile')?.value);
+      if (!mobile) return;
+      const currentId = editingType === 'complaint' ? editingId : null;
+      const matches = (appData.complaints || []).filter(c => normalizeMobileNo(c.mobileNo) === mobile && c.id != currentId);
+      if (!matches.length) return;
+      document.getElementById('previousComplaintsTitle').textContent = `${matches.length} previous complaint(s) found for ${mobile}`;
+      document.getElementById('previousComplaintsContent').innerHTML = `
+        <div class="table-container">
+          <table>
+            <thead><tr><th>Date</th><th>ID</th><th>Train</th><th>Nature</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody>
+              ${matches.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 20).map(c => `
+                <tr>
+                  <td>${formatDate(c.date)}</td>
+                  <td>${c.complaintId || '-'}</td>
+                  <td>${c.trainName || '-'}</td>
+                  <td>${c.complainNature || '-'}</td>
+                  <td><span class="badge badge-${c.status === 'Closed' ? 'success' : c.status === 'In Progress' ? 'warning' : 'danger'}">${c.status || 'Open'}</span></td>
+                  <td>${c.details || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      document.getElementById('previousComplaintsModal').classList.add('active');
+    }
+
+    function closePreviousComplaintsModal() {
+      document.getElementById('previousComplaintsModal').classList.remove('active');
     }
 
     function getNatureCategory(nature) {
@@ -5890,11 +6083,22 @@ function showPage(page) {
       document.getElementById('complaintBusinessHead').value = c.businessHead || '';
       document.getElementById('complaintVp').value = c.vp || '';
       document.getElementById('complaintName').value = c.complainantName || '';
+      document.getElementById('complaintEmail').value = c.email || '';
       document.getElementById('complaintMobile').value = c.mobileNo || '';
+      document.getElementById('complaintReferenceNo').value = c.referenceNo || c.complaintRefNo || '';
       document.getElementById('complaintPnr').value = c.pnrNo || '';
+      document.getElementById('complaintCoachNo').value = c.coachNo || '';
+      document.getElementById('complaintPhysicalCoachNo').value = c.physicalCoachNo || '';
+      document.getElementById('complaintBerthNo').value = c.berthNo || '';
+      document.getElementById('complaintCommencementDateTime').value = c.commencementDateTime || '';
       document.getElementById('complaintType').value = c.complaintType || '';
       document.getElementById('complaintNature').value = c.complainNature;
       document.getElementById('complaintDetails').value = c.details || '';
+      document.getElementById('complaintAction1').value = c.actionTaken1 || '';
+      document.getElementById('complaintAction2').value = c.actionTaken2 || '';
+      document.getElementById('complaintAction3').value = c.actionTaken3 || '';
+      document.getElementById('complaintAction4').value = c.actionTaken4 || '';
+      document.getElementById('complaintAction5').value = c.actionTaken5 || '';
       document.getElementById('complaintRemarks').value = c.remarks || '';
 
       switchComplaintTab('entry');
@@ -6884,15 +7088,27 @@ function showPage(page) {
             trainManager: effective?.trainManager || '',
             businessHead: effective?.businessHead || '',
             vp: effective?.vp || '',
-            complainantName: getColumnValue(row, ['Complainant Name', 'complainantname', 'Name']) || '',
-            mobileNo: getColumnValue(row, ['Mobile No', 'mobileno', 'Mobile']) || '',
-            pnrNo: getColumnValue(row, ['PNR No', 'pnrno', 'PNR']) || '',
+            complainantName: getColumnValue(row, ['Complainant Details', 'Complainant Name', 'complainantname', 'Name']) || '',
+            email: getColumnValue(row, ['Email', 'Email ID', 'email']) || '',
+            mobileNo: getColumnValue(row, ['Mobile No', 'Mobile Number', 'mobileno', 'Mobile']) || '',
+            referenceNo: getColumnValue(row, ['Reference No', 'Reference Number', 'Complaint Ref No', 'Ref No']) || '',
+            pnrNo: getColumnValue(row, ['PNR / UTS No', 'PNR / UTS', 'PNR No', 'pnrno', 'PNR', 'UTS No']) || '',
+            coachNo: getColumnValue(row, ['Coach No', 'Coach Number', 'coachno']) || '',
+            physicalCoachNo: getColumnValue(row, ['Physical Coach No', 'Physical Coach Number']) || '',
+            berthNo: getColumnValue(row, ['Berth No', 'Berth Number']) || '',
+            commencementDateTime: getColumnValue(row, ['Train Commencement Date Time', 'Train Commencement Date&Time', 'Commencement Date Time']) || '',
             complaintType: getColumnValue(row, ['Complaint Type', 'complainttype', 'Type']) || '',
             complainNature: getColumnValue(row, ['Nature', 'Complaint Nature', 'Complain Nature', 'complainnature']) || '',
-            details: getColumnValue(row, ['Complaint Matter', 'Details', 'details', 'Description']) || '',
+            details: getColumnValue(row, ['Complaint Description', 'Complaint Matter', 'Details', 'details', 'Description']) || '',
+            actionTaken1: getColumnValue(row, ['Action Taken 1', 'Action 1']) || '',
+            actionTaken2: getColumnValue(row, ['Action Taken 2', 'Action 2']) || '',
+            actionTaken3: getColumnValue(row, ['Action Taken 3', 'Action 3']) || '',
+            actionTaken4: getColumnValue(row, ['Action Taken 4', 'Action 4']) || '',
+            actionTaken5: getColumnValue(row, ['Action Taken 5', 'Action 5']) || '',
             remarks: getColumnValue(row, ['Licensee Remarks', 'Remarks', 'remarks']) || 'Imported from Excel'
           };
 
+          if (!complaint.mobileNo || !complaint.referenceNo || !complaint.pnrNo || !complaint.coachNo || !complaint.complainNature || !complaint.details) { skipped++; return; }
           ensureYardExists(complaint.yard);
           if (pushOrOverwriteEntry('complaints', complaint, overwriteState)) imported++;
           else skipped++;
@@ -7218,12 +7434,22 @@ function showPage(page) {
         'Train Manager': 'Manager B',
         'Business Head': 'Business Head A',
         'VP': 'VP A',
-        'Complainant Name': 'John Doe',
-        'Mobile No': '9876543210',
-        'PNR No': '1234567890',
-        'Complaint Type': 'Service',
-        'Complain Nature': 'Food Quality - Taste Issue',
-        'Details': 'Food was not fresh',
+        'Complainant Details': 'John Doe',
+        'Email': '',
+        'Mobile No': '7278061588',
+        'Reference No': 'REF001',
+        'PNR / UTS No': '1234567890',
+        'Coach No': 'B2',
+        'Physical Coach No': '2',
+        'Berth No': '34',
+        'Train Commencement Date Time': '2026-05-15T23:55',
+        'Complain Nature': 'Quality',
+        'Complaint Description': 'Food was not fresh',
+        'Action Taken 1': 'Called customer and noted issue.',
+        'Action Taken 2': '',
+        'Action Taken 3': '',
+        'Action Taken 4': '',
+        'Action Taken 5': '',
         'Remarks': ''
       }];
       downloadExcel(data, 'complaint_import_sample.xlsx');
@@ -7242,6 +7468,39 @@ function showPage(page) {
         'Remarks': 'Daily collection'
       }];
       downloadExcel(data, 'cash_import_sample.xlsx');
+    }
+
+    function downloadComplaintEntryReport() {
+      const rows = (appData.complaints || []).map(c => ({
+        Date: c.date || '',
+        Status: c.status || '',
+        'Complaint ID': c.complaintId || '',
+        'Reference No': c.referenceNo || '',
+        Source: c.source || '',
+        Train: c.trainName || '',
+        'Train No': c.trainNo || c.trainNumber || '',
+        Yard: c.yard || '',
+        'Train Manager': c.trainManager || '',
+        'Rake Manager': c.rakeManager || '',
+        'Rake Number': c.rakeNumber || '',
+        'Complainant Details': c.complainantName || '',
+        Email: c.email || '',
+        Mobile: c.mobileNo || '',
+        'PNR / UTS': c.pnrNo || '',
+        'Coach No': c.coachNo || '',
+        'Physical Coach No': c.physicalCoachNo || '',
+        'Berth No': c.berthNo || '',
+        'Train Commencement Date Time': c.commencementDateTime || '',
+        Nature: c.complainNature || '',
+        Description: c.details || '',
+        'Action Taken 1': c.actionTaken1 || '',
+        'Action Taken 2': c.actionTaken2 || '',
+        'Action Taken 3': c.actionTaken3 || '',
+        'Action Taken 4': c.actionTaken4 || '',
+        'Action Taken 5': c.actionTaken5 || '',
+        Remarks: c.remarks || ''
+      }));
+      downloadExcel(rows, `complaint_entry_report_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
 
     function downloadMasterSample() {
@@ -7573,6 +7832,8 @@ function showPage(page) {
     window.clearComplaintForm = clearComplaintForm;
     window.editComplaint = editComplaint;
     window.deleteComplaint = deleteComplaint;
+    window.checkPreviousComplaintsByMobile = checkPreviousComplaintsByMobile;
+    window.closePreviousComplaintsModal = closePreviousComplaintsModal;
     window.filterComplaintTrains = filterComplaintTrains;
     window.showComplaintTrainDropdown = showComplaintTrainDropdown;
     window.selectComplaintTrain = selectComplaintTrain;
@@ -7611,6 +7872,7 @@ function showPage(page) {
     window.importMasterExcel = importMasterExcel;
     window.downloadSalesSample = downloadSalesSample;
     window.downloadComplaintSample = downloadComplaintSample;
+    window.downloadComplaintEntryReport = downloadComplaintEntryReport;
     window.downloadCashSample = downloadCashSample;
     window.downloadMasterSample = downloadMasterSample;
     window.downloadMasterData = downloadMasterData;
