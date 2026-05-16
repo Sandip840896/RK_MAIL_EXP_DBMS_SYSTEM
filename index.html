@@ -1123,6 +1123,36 @@
             </div>
           </div>
 
+          <!-- Central Feedback Calling Table -->
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">Complaint Feedback Calling List</h3>
+                <p class="card-subtitle">Rake manager and customer contact list for central feedback calls.</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('complaintFeedbackTable', 'complaint_feedback_calling_list')">
+                <i class="fas fa-file-excel"></i>
+              </button>
+            </div>
+            <div class="table-container">
+              <table id="complaintFeedbackTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Rake Manager</th>
+                    <th>Rake Manager Phone</th>
+                    <th>Customer Phone</th>
+                    <th>Train Detail</th>
+                    <th>Nature</th>
+                    <th>Reference No</th>
+                  </tr>
+                </thead>
+                <tbody id="complaintFeedbackTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- Comparison Tables -->
           <div class="grid grid-2" style="margin-top: 16px;">
             <div class="card">
@@ -1471,6 +1501,10 @@
                 <div class="form-field">
                   <label>Rake Number</label>
                   <input type="text" id="complaintRakeNumber" readonly>
+                </div>
+                <div class="form-field">
+                  <label>Rake Manager Phone</label>
+                  <input type="text" id="complaintRakeManagerPhone" readonly>
                 </div>
                 <div class="form-field">
                   <label>Train Manager</label>
@@ -4290,6 +4324,7 @@ function showPage(page) {
 
       renderTopTrainsTable(complaintsP1, complaintsP2);
       renderRepeatComplainantTable(complaintsP1);
+      renderComplaintFeedbackTable(complaintsP1);
       
       renderComplaintComparisonTables(complaintsP1, complaintsP2);
       updateCompChartFilterDisplay();
@@ -4842,6 +4877,39 @@ function showPage(page) {
           <td>${r.latest.complainNature || '-'}</td>
         </tr>
       `).join('') : '<tr><td colspan="6" style="text-align:center;color:#64748b;">No mobile number data in this period</td></tr>';
+    }
+
+
+    function getComplaintRakeManagerPhone(complaint) {
+      if (complaint?.rakeManagerContact || complaint?.rakeManagerPhone) return complaint.rakeManagerContact || complaint.rakeManagerPhone;
+      const effective = getEffectiveMaster(complaint?.trainNo || complaint?.trainNumber, complaint?.trainName, complaint?.date, complaint?.rakeManager, complaint?.rakeNumber);
+      return effective?.rakeManagerContact || effective?.rakeManagerPhone || '';
+    }
+
+    function renderComplaintFeedbackTable(complaints) {
+      const tbody = document.getElementById('complaintFeedbackTableBody');
+      if (!tbody) return;
+
+      const rows = (complaints || [])
+        .slice()
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 200);
+
+      tbody.innerHTML = rows.length ? rows.map(c => {
+        const trainDetail = `${c.trainName || '-'}${c.trainNo || c.trainNumber ? ' (' + (c.trainNo || c.trainNumber) + ')' : ''}${c.rakeNumber ? ' / Rake ' + c.rakeNumber : ''}`;
+        return `
+          <tr>
+            <td>${formatDate(c.date)}</td>
+            <td><span class="badge badge-${c.status === 'Closed' ? 'success' : c.status === 'In Progress' ? 'warning' : 'danger'}">${c.status || 'Open'}</span></td>
+            <td>${c.rakeManager || '-'}</td>
+            <td>${getComplaintRakeManagerPhone(c) || '-'}</td>
+            <td>${c.mobileNo || '-'}</td>
+            <td>${trainDetail}</td>
+            <td>${c.complainNature || '-'}</td>
+            <td>${c.referenceNo || '-'}</td>
+          </tr>
+        `;
+      }).join('') : '<tr><td colspan="8" style="text-align:center;color:#64748b;">No complaint data in this period</td></tr>';
     }
 
     function renderTopTrainsTable(current, prev) {
@@ -5812,6 +5880,7 @@ function showPage(page) {
       if (!options.length) {
         select.innerHTML = '<option value="">No rake manager found in master</option>';
         document.getElementById('complaintRakeNumber').value = '';
+        document.getElementById('complaintRakeManagerPhone').value = '';
         document.getElementById('complaintTrainManager').value = '';
         document.getElementById('complaintBusinessHead').value = '';
         document.getElementById('complaintVp').value = '';
@@ -5832,6 +5901,7 @@ function showPage(page) {
       const rakeNumber = document.getElementById('complaintRakeManager')?.selectedOptions?.[0]?.dataset?.rakeNumber || '';
       const effective = getEffectiveMaster(trainNo, trainName, document.getElementById('complaintDate')?.value, rakeManager, rakeNumber);
       document.getElementById('complaintRakeNumber').value = effective?.rakeNumber || rakeNumber || '';
+      document.getElementById('complaintRakeManagerPhone').value = effective?.rakeManagerContact || effective?.rakeManagerPhone || '';
       document.getElementById('complaintTrainManager').value = effective?.trainManager || '';
       document.getElementById('complaintBusinessHead').value = effective?.businessHead || '';
       document.getElementById('complaintVp').value = effective?.vp || '';
@@ -5884,6 +5954,7 @@ function showPage(page) {
         yard: document.getElementById('complaintYard').value,
         rakeManager: rakeManager,
         rakeNumber: document.getElementById('complaintRakeNumber').value || effective?.rakeNumber || '',
+        rakeManagerContact: document.getElementById('complaintRakeManagerPhone').value || effective?.rakeManagerContact || effective?.rakeManagerPhone || '',
         trainManager: document.getElementById('complaintTrainManager').value || effective?.trainManager || '',
         businessHead: document.getElementById('complaintBusinessHead').value || effective?.businessHead || '',
         vp: document.getElementById('complaintVp').value || effective?.vp || '',
@@ -5939,6 +6010,7 @@ function showPage(page) {
       document.getElementById('complaintYard').value = appData.yards[0] || '';
       document.getElementById('complaintRakeManager').innerHTML = '<option value="">Select train first</option>';
       document.getElementById('complaintRakeNumber').value = '';
+      document.getElementById('complaintRakeManagerPhone').value = '';
       document.getElementById('complaintTrainManager').value = '';
       document.getElementById('complaintBusinessHead').value = '';
       document.getElementById('complaintVp').value = '';
@@ -6079,6 +6151,8 @@ function showPage(page) {
       populateComplaintRakeManagers(c.trainNo, c.trainName, c.rakeManager || '');
       document.getElementById('complaintRakeManager').value = c.rakeManager || '';
       document.getElementById('complaintRakeNumber').value = c.rakeNumber || '';
+      document.getElementById('complaintRakeManagerPhone').value = c.rakeManagerContact || c.rakeManagerPhone || '';
+      if (!document.getElementById('complaintRakeManagerPhone').value) onComplaintRakeManagerChange();
       document.getElementById('complaintTrainManager').value = c.trainManager || '';
       document.getElementById('complaintBusinessHead').value = c.businessHead || '';
       document.getElementById('complaintVp').value = c.vp || '';
@@ -7085,6 +7159,7 @@ function showPage(page) {
             yard: effective?.yard || getColumnValue(row, ['Yard', 'yard']) || appData.yards[0] || '',
             rakeManager: finalRakeManager,
             rakeNumber: rakeNumber || effective?.rakeNumber || '',
+            rakeManagerContact: getColumnValue(row, ['Rake Manager Phone', 'Rake Manager Contact', 'CONTACT NO', 'Contact No']) || effective?.rakeManagerContact || '',
             trainManager: effective?.trainManager || '',
             businessHead: effective?.businessHead || '',
             vp: effective?.vp || '',
@@ -7428,6 +7503,7 @@ function showPage(page) {
         'Train No': '12345',
         'Train Name': 'Sample Express',
         'Rake Manager': 'Rake M',
+        'Rake Manager Phone': '9000000002',
         'Rake Number': 'Rake-01',
         'Train Type': 'WCB',
         'Yard': 'Howrah',
@@ -7482,6 +7558,7 @@ function showPage(page) {
         Yard: c.yard || '',
         'Train Manager': c.trainManager || '',
         'Rake Manager': c.rakeManager || '',
+        'Rake Manager Phone': c.rakeManagerContact || c.rakeManagerPhone || '',
         'Rake Number': c.rakeNumber || '',
         'Complainant Details': c.complainantName || '',
         Email: c.email || '',
