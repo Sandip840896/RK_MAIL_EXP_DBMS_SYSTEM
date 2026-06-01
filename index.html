@@ -2768,13 +2768,14 @@ console.log("✅ Connected to NEW Firebase");
           const snapshot = await firebaseDb.ref('rkGroupData').once('value');
           const cloudData = snapshot.val();
           if (cloudData) {
-            appData = cloudData;
+            appData = decodeCloudData(cloudData);
             const saved = localStorage.getItem('rkGroupData');
             if (saved) {
               try {
                 const localData = JSON.parse(saved);
-                if ((localData.users || []).length > (cloudData.users || []).length) {
-                  appData.users = mergeUsers(cloudData.users || [], localData.users || []);
+                const decodedCloudData = decodeCloudData(cloudData);
+                if ((localData.users || []).length > (decodedCloudData.users || []).length) {
+                  appData.users = mergeUsers(decodedCloudData.users || [], localData.users || []);
                 }
               } catch (error) {
                 console.warn('Could not merge local users with Firebase users.', error);
@@ -7779,11 +7780,11 @@ function showPage(page) {
         if (!silent) showAlert('Syncing data to cloud...', 'info');
         
         const snapshot = await firebaseDb.ref('rkGroupData').once('value');
-        const cloudData = snapshot.val() || {};
+        const cloudData = decodeCloudData(snapshot.val() || {});
         const dataToSync = options.forceOverwrite ? buildCloudPayload(appData) : mergeCloudAndLocalData(cloudData, appData);
         dataToSync.lastSync = new Date().toISOString();
         
-        await firebaseDb.ref('rkGroupData').set(dataToSync);
+        await firebaseDb.ref('rkGroupData').set(encodeCloudData(dataToSync));
         appData = dataToSync;
         localStorage.setItem('rkGroupData', JSON.stringify(appData));
         if (!silent) showAlert('Data synced to cloud successfully!', 'success');
@@ -7808,7 +7809,7 @@ function showPage(page) {
         showAlert('Fetching data from cloud...', 'info');
         
         const snapshot = await firebaseDb.ref('rkGroupData').once('value');
-        const cloudData = snapshot.val();
+        const cloudData = decodeCloudData(snapshot.val());
         
         if (!cloudData) {
           showAlert('No data found in cloud. Sync to cloud first.', 'warning');
@@ -7839,6 +7840,48 @@ function showPage(page) {
         console.error('Sync from cloud error:', error);
         showAlert('Failed to sync from cloud: ' + error.message, 'error');
       }
+    }
+
+    function encodeFirebaseKey(key) {
+      return encodeURIComponent(String(key || '').trim()).replace(/\./g, '%2E');
+    }
+
+    function decodeFirebaseKey(key) {
+      try { return decodeURIComponent(String(key || '').replace(/%2E/g, '.')); }
+      catch (error) { return String(key || ''); }
+    }
+
+    function encodeHierarchyMap(map = {}) {
+      const encoded = {};
+      Object.entries(map || {}).forEach(([key, value]) => {
+        const safeKey = encodeFirebaseKey(key);
+        if (safeKey) encoded[safeKey] = value;
+      });
+      return encoded;
+    }
+
+    function decodeHierarchyMap(map = {}) {
+      const decoded = {};
+      Object.entries(map || {}).forEach(([key, value]) => {
+        const realKey = decodeFirebaseKey(key);
+        if (realKey) decoded[realKey] = value;
+      });
+      return decoded;
+    }
+
+    function encodeCloudData(data = {}) {
+      const copy = { ...(data || {}) };
+      copy.trainManagerHierarchy = encodeHierarchyMap(copy.trainManagerHierarchy || {});
+      copy.rakeManagerHierarchy = encodeHierarchyMap(copy.rakeManagerHierarchy || {});
+      return copy;
+    }
+
+    function decodeCloudData(data = {}) {
+      if (!data) return data;
+      const copy = { ...(data || {}) };
+      copy.trainManagerHierarchy = decodeHierarchyMap(copy.trainManagerHierarchy || {});
+      copy.rakeManagerHierarchy = decodeHierarchyMap(copy.rakeManagerHierarchy || {});
+      return copy;
     }
 
     function makeRecordKey(item, fallbackIndex) {
