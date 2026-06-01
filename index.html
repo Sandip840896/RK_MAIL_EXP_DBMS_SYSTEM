@@ -2917,15 +2917,15 @@ console.log("✅ Connected to NEW Firebase");
       return true;
     }
 
-    function saveData() {
+    function saveData(options = {}) {
       localStorage.setItem('rkGroupData', JSON.stringify(appData));
-      autoSyncToCloud(); // Auto-sync to cloud if Firebase is configured
+      autoSyncToCloud(options); // Auto-sync to cloud if Firebase is configured
     }
 
     function resetToDefault() {
       if (!requireMasterDeleteKey('reset everything')) return;
       appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
-      saveData();
+      saveData({ forceOverwrite: true });
       showAlert('Data reset to defaults', 'success');
       loadDashboard();
     }
@@ -2943,7 +2943,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!ensureEditable('delete sales data') || !requireMasterDeleteKey('delete all sales data')) return;
       if (!confirm('Delete ALL sales data? This cannot be undone!')) return;
       appData.sales = [];
-      saveData();
+      saveData({ forceOverwrite: true });
       showAlert('All sales data deleted', 'success');
       loadDashboard();
     }
@@ -2952,7 +2952,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!ensureEditable('delete complaint data') || !requireMasterDeleteKey('delete all complaint data')) return;
       if (!confirm('Delete ALL complaint data? This cannot be undone!')) return;
       appData.complaints = [];
-      saveData();
+      saveData({ forceOverwrite: true });
       showAlert('All complaint data deleted', 'success');
       loadDashboard();
       loadComplaintDashboard();
@@ -2962,7 +2962,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!ensureEditable('delete cash data') || !requireMasterDeleteKey('delete all cash data')) return;
       if (!confirm('Delete ALL cash deposit data? This cannot be undone!')) return;
       appData.cash = [];
-      saveData();
+      saveData({ forceOverwrite: true });
       showAlert('All cash data deleted', 'success');
       loadDashboard();
       loadCashDashboard();
@@ -2972,7 +2972,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!ensureEditable('delete train manager master') || !requireMasterDeleteKey('delete all train manager master data')) return;
       if (!confirm('Delete ALL train manager master data? Existing sales, complaints and cash entries will remain.')) return;
       appData.trainMasters = [];
-      saveData();
+      saveData({ forceOverwrite: true });
       showAlert('All train manager master data deleted', 'success');
       loadMastersPage();
     }
@@ -2981,7 +2981,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!ensureEditable('delete target master') || !requireMasterDeleteKey('delete all sales and GP target master data')) return;
       if (!confirm('Delete ALL sales and GP target master data? Existing transaction entries will remain.')) return;
       appData.targetMasters = [];
-      saveData();
+      saveData({ forceOverwrite: true });
       showAlert('All target master data deleted', 'success');
       loadMastersPage();
     }
@@ -7765,7 +7765,7 @@ function showPage(page) {
     }
 
     // ==================== FIREBASE SYNC FUNCTIONS ====================
-    async function syncToCloud(silent = false) {
+    async function syncToCloud(silent = false, options = {}) {
       if (!silent && !ensureEditable('sync data to cloud')) return;
       if (!firebaseInitialized) {
         // Try to initialize Firebase
@@ -7778,25 +7778,20 @@ function showPage(page) {
       try {
         if (!silent) showAlert('Syncing data to cloud...', 'info');
         
-        const dataToSync = {
-          users: appData.users,
-          yards: appData.yards,
-          clusterManagers: appData.clusterManagers,
-          trainManagers: appData.trainManagers,
-          trainMasters: appData.trainMasters,
-          targetMasters: appData.targetMasters,
-          sales: appData.sales,
-          complaints: appData.complaints,
-          cash: appData.cash,
-          lastSync: new Date().toISOString()
-        };
+        const snapshot = await firebaseDb.ref('rkGroupData').once('value');
+        const cloudData = snapshot.val() || {};
+        const dataToSync = options.forceOverwrite ? buildCloudPayload(appData) : mergeCloudAndLocalData(cloudData, appData);
+        dataToSync.lastSync = new Date().toISOString();
         
         await firebaseDb.ref('rkGroupData').set(dataToSync);
+        appData = dataToSync;
+        localStorage.setItem('rkGroupData', JSON.stringify(appData));
         if (!silent) showAlert('Data synced to cloud successfully!', 'success');
-        console.log('Data synced to Firebase at:', new Date().toISOString());
+        console.log('Data synced to Firebase at:', dataToSync.lastSync);
       } catch (error) {
         console.error('Sync to cloud error:', error);
         if (!silent) showAlert('Failed to sync to cloud: ' + error.message, 'error');
+        else showAlert('Cloud save failed. Data is saved in this browser only until sync succeeds: ' + error.message, 'warning');
       }
     }
 
@@ -7846,14 +7841,70 @@ function showPage(page) {
       }
     }
 
+    function makeRecordKey(item, fallbackIndex) {
+      if (!item || typeof item !== 'object') return `row_${fallbackIndex}`;
+      if (item.email) return `email:${String(item.email).toLowerCase()}`;
+      if (item.id !== undefined && item.id !== null) return `id:${item.id}`;
+      const date = item.date || item.validFrom || '';
+      const train = item.trainNumber || item.trainNo || item.trainName || '';
+      const ref = item.referenceNo || item.complaintId || item.rakeManager || item.trainManager || item.name || '';
+      return `${date}|${train}|${ref}|${fallbackIndex}`;
+    }
+
+    function mergeArrayByKey(cloudRows = [], localRows = []) {
+      const merged = new Map();
+      (Array.isArray(cloudRows) ? cloudRows : []).forEach((item, index) => merged.set(makeRecordKey(item, index), item));
+      (Array.isArray(localRows) ? localRows : []).forEach((item, index) => merged.set(makeRecordKey(item, index), item));
+      return [...merged.values()];
+    }
+
+    function buildCloudPayload(source) {
+      return {
+        users: source.users || [],
+        yards: source.yards || [],
+        clusterManagers: source.clusterManagers || [],
+        trainManagers: source.trainManagers || [],
+        rakeManagers: source.rakeManagers || [],
+        trainManagerHierarchy: source.trainManagerHierarchy || {},
+        rakeManagerHierarchy: source.rakeManagerHierarchy || {},
+        trainMasters: source.trainMasters || [],
+        targetMasters: source.targetMasters || [],
+        sales: source.sales || [],
+        complaints: source.complaints || [],
+        cash: source.cash || []
+      };
+    }
+
+    function mergeCloudAndLocalData(cloudData = {}, localData = {}) {
+      return {
+        users: mergeArrayByKey(cloudData.users, localData.users),
+        yards: [...new Set([...(cloudData.yards || []), ...(localData.yards || [])])],
+        clusterManagers: [...new Set([...(cloudData.clusterManagers || []), ...(localData.clusterManagers || [])])],
+        trainManagers: [...new Set([...(cloudData.trainManagers || []), ...(localData.trainManagers || [])])],
+        rakeManagers: [...new Set([...(cloudData.rakeManagers || []), ...(localData.rakeManagers || [])])],
+        trainManagerHierarchy: { ...(cloudData.trainManagerHierarchy || {}), ...(localData.trainManagerHierarchy || {}) },
+        rakeManagerHierarchy: { ...(cloudData.rakeManagerHierarchy || {}), ...(localData.rakeManagerHierarchy || {}) },
+        trainMasters: mergeArrayByKey(cloudData.trainMasters, localData.trainMasters),
+        targetMasters: mergeArrayByKey(cloudData.targetMasters, localData.targetMasters),
+        sales: mergeArrayByKey(cloudData.sales, localData.sales),
+        complaints: mergeArrayByKey(cloudData.complaints, localData.complaints),
+        cash: mergeArrayByKey(cloudData.cash, localData.cash)
+      };
+    }
+
     // Auto-sync to cloud when data changes (if Firebase is configured)
-    function autoSyncToCloud() {
+    function autoSyncToCloud(options = {}) {
       if (firebaseInitialized) {
         // Debounce sync to avoid too many writes
         clearTimeout(window.syncTimeout);
         window.syncTimeout = setTimeout(() => {
-          syncToCloud(true).catch(err => console.error('Auto-sync error:', err));
-        }, 800);
+          syncToCloud(true, options).catch(err => {
+            console.error('Auto-sync error:', err);
+            showAlert('Cloud save failed. Please check internet/Firebase and press Sync.', 'warning');
+          });
+        }, options.forceOverwrite ? 0 : 300);
+      } else {
+        showAlert('Firebase is not connected. Data is saved in this browser only.', 'warning');
       }
     }
 
