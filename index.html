@@ -1389,6 +1389,11 @@
                   </select>
                 </div>
               </div>
+              <div class="action-btns" style="justify-content:flex-end; margin: 0 0 12px;">
+                <button class="btn btn-success btn-sm" onclick="downloadCurrentDaySalesEntries()">
+                  <i class="fas fa-file-excel"></i> Download Today's Sales
+                </button>
+              </div>
               <div class="table-container">
                 <table id="salesTable">
                   <thead>
@@ -1795,6 +1800,38 @@
             </div>
           </div>
 
+          <!-- Date-wise Cash Collection Table -->
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">Date-wise Cash Collection Summary</h3>
+                <p class="card-subtitle">Cash deposits, online deposits, and pending amount where sales entry exists.</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('cashCollectionTable', 'date_wise_cash_collection')">
+                <i class="fas fa-file-excel"></i>
+              </button>
+            </div>
+            <div class="table-container">
+              <table id="cashCollectionTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Sales Entries</th>
+                    <th>Cash Entries</th>
+                    <th>Amount To Collect</th>
+                    <th>Cash Deposited</th>
+                    <th>Online Deposited</th>
+                    <th>Total Deposited</th>
+                    <th>Pending No Deposit</th>
+                    <th>Pending Short</th>
+                    <th>Total Pending</th>
+                  </tr>
+                </thead>
+                <tbody id="cashCollectionTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- Manager-wise Cash Deposit Table -->
           <div class="card" style="margin-top: 16px;">
             <div class="card-header">
@@ -1990,6 +2027,11 @@
                     <option value="">All Trains</option>
                   </select>
                 </div>
+              </div>
+              <div class="action-btns" style="justify-content:flex-end; margin: 0 0 12px;">
+                <button class="btn btn-success btn-sm" onclick="downloadCurrentDayCashEntries()">
+                  <i class="fas fa-file-excel"></i> Download Today's Cash
+                </button>
               </div>
               <div class="table-container">
                 <table id="cashTable">
@@ -5151,7 +5193,7 @@ function showPage(page) {
       if (yardFilter) { cashData = cashData.filter(c => c.yard === yardFilter); salesData = salesData.filter(s => s.yard === yardFilter); }
       if (managerFilter) { cashData = cashData.filter(c => { const train = appData.trainMasters.find(t => t.trainName === c.trainName); return train && train.trainManager === managerFilter; }); salesData = salesData.filter(s => s.trainManager === managerFilter); }
 
-      const gpCollected = salesData.reduce((sum, s) => sum + (Number(s.salesAchievement || s.totalSale) || 0), 0);
+      const gpCollected = salesData.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
       const totalDeposit = cashData.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
       const cashCounter = cashData.reduce((sum, c) => sum + (Number(c.cashDepositCounter) || 0), 0);
       const onlineDeposit = cashData.reduce((sum, c) => sum + (Number(c.onlineDeposit) || 0), 0);
@@ -5186,6 +5228,7 @@ function showPage(page) {
         excessCard.style.display = 'none';
       }
 
+      renderCashCollectionTable(cashData, salesData);
       renderManagerCashTable(cashData, salesData);
       renderPendingDepositTable(cashData, salesData);
       if (!(appData.cash || []).length && !noDataPopupShown.cash) {
@@ -5194,18 +5237,67 @@ function showPage(page) {
       }
     }
 
+    function getSaleCollectableAmount(sale) {
+      return Number(sale?.amountToCollect || sale?.salesAchievement || sale?.totalSale) || 0;
+    }
+
+    function getCashEntryManager(cashEntry) {
+      if (cashEntry?.trainManager) return cashEntry.trainManager;
+      const train = (appData.trainMasters || []).find(t => buildTrainKey(t.trainNumber, t.trainName) === buildTrainKey(cashEntry?.trainNumber, cashEntry?.trainName));
+      return train?.trainManager || 'Unassigned';
+    }
+
+    function renderCashCollectionTable(cashData, salesData) {
+      const tbody = document.getElementById('cashCollectionTableBody');
+      if (!tbody) return;
+      const dates = [...new Set([...(salesData || []).map(s => getComparableDate(s.date)), ...(cashData || []).map(c => getComparableDate(c.date))].filter(Boolean))].sort();
+      const rows = dates.map(date => {
+        const daySales = (salesData || []).filter(s => getComparableDate(s.date) === date);
+        const dayCash = (cashData || []).filter(c => getComparableDate(c.date) === date);
+        const amountToCollect = daySales.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
+        const cashDeposit = dayCash.reduce((sum, c) => sum + (Number(c.cashDepositCounter) || 0), 0);
+        const onlineDeposit = dayCash.reduce((sum, c) => sum + (Number(c.onlineDeposit) || 0), 0);
+        const totalDeposit = dayCash.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
+        const pendingNoDeposit = daySales.reduce((sum, s) => {
+          const matchingDeposits = dayCash.filter(c => isSameTrainForCashSale(c, s));
+          return matchingDeposits.length ? sum : sum + getSaleCollectableAmount(s);
+        }, 0);
+        const pendingShort = daySales.reduce((sum, s) => {
+          const matchingDeposits = dayCash.filter(c => isSameTrainForCashSale(c, s));
+          if (!matchingDeposits.length) return sum;
+          const deposited = matchingDeposits.reduce((total, c) => total + (Number(c.totalDeposit) || 0), 0);
+          return sum + Math.max(getSaleCollectableAmount(s) - deposited, 0);
+        }, 0);
+        return { date, salesCount: daySales.length, cashCount: dayCash.length, amountToCollect, cashDeposit, onlineDeposit, totalDeposit, pendingNoDeposit, pendingShort, totalPending: pendingNoDeposit + pendingShort };
+      }).sort((a, b) => b.date.localeCompare(a.date));
+
+      tbody.innerHTML = rows.length ? rows.map(r => `
+        <tr>
+          <td>${formatDate(r.date)}</td>
+          <td>${r.salesCount}</td>
+          <td>${r.cashCount}</td>
+          <td>${formatCurrency(r.amountToCollect)}</td>
+          <td>${formatCurrency(r.cashDeposit)}</td>
+          <td>${formatCurrency(r.onlineDeposit)}</td>
+          <td>${formatCurrency(r.totalDeposit)}</td>
+          <td>${formatCurrency(r.pendingNoDeposit)}</td>
+          <td>${formatCurrency(r.pendingShort)}</td>
+          <td><strong>${formatCurrency(r.totalPending)}</strong></td>
+        </tr>
+      `).join('') : '<tr><td colspan="10" style="text-align:center;color:#64748b;">No cash/sales data for selected filters.</td></tr>';
+    }
+
     function renderManagerCashTable(cashData, salesData) {
       const managerMap = {};
       
       salesData.forEach(s => {
         const manager = s.trainManager || 'Unassigned';
         if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
-        managerMap[manager].gpAchievement += Number(s.salesAchievement || s.totalSale) || 0;
+        managerMap[manager].gpAchievement += getSaleCollectableAmount(s);
       });
 
       cashData.forEach(c => {
-        const train = appData.trainMasters.find(t => t.trainName === c.trainName);
-        const manager = train?.trainManager || 'Unassigned';
+        const manager = getCashEntryManager(c);
         if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
         managerMap[manager].cashDeposit += Number(c.cashDepositCounter) || 0;
         managerMap[manager].onlineDeposit += Number(c.onlineDeposit) || 0;
@@ -5274,7 +5366,7 @@ function showPage(page) {
       const rows = salesData.map(s => {
         const matchingDeposits = cashData.filter(c => getComparableDate(c.date) === getComparableDate(s.date) && isSameTrainForCashSale(c, s));
         const deposited = matchingDeposits.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
-        const totalSale = Number(s.amountToCollect || s.salesAchievement || s.totalSale) || 0;
+        const totalSale = getSaleCollectableAmount(s);
         const latestCash = matchingDeposits.sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0];
         return {
           rakeManager: latestCash?.rakeManager || s.rakeManager || 'Unassigned',
@@ -5869,15 +5961,18 @@ function showPage(page) {
       document.getElementById('complaintTrainNo').value = normalizeTrainNo(number) || number || '';
       document.getElementById('complaintTrainType').value = type;
       if (yard) document.getElementById('complaintYard').value = yard;
-      populateComplaintRakeManagers(number, name);
+      populateComplaintRakeManagers(number, name, '', id);
       onComplaintRakeManagerChange();
     }
 
-    function populateComplaintRakeManagers(trainNumber, trainName, selectedRakeManager = '') {
+    function populateComplaintRakeManagers(trainNumber, trainName, selectedRakeManager = '', selectedTrainId = '') {
       const select = document.getElementById('complaintRakeManager');
       if (!select) return;
       const date = document.getElementById('complaintDate')?.value || '';
-      const options = getRakeOptionsForTrain(trainNumber, trainName, date);
+      const selectedMaster = selectedTrainId ? (appData.trainMasters || []).find(t => t.id == selectedTrainId) : null;
+      let options = getRakeOptionsForTrain(trainNumber, trainName, date);
+      if (!options.length && selectedMaster && (selectedMaster.rakeManager || selectedMaster.rakeNumber)) options = [selectedMaster];
+      if (!options.length && trainName) options = (appData.trainMasters || []).filter(t => normalizeText(t.trainName) === normalizeText(trainName) && (t.rakeManager || t.rakeNumber));
       if (!options.length) {
         select.innerHTML = '<option value="">No rake manager found in master</option>';
         document.getElementById('complaintRakeNumber').value = '';
@@ -5904,6 +5999,19 @@ function showPage(page) {
       document.getElementById('complaintRakeNumber').value = effective?.rakeNumber || rakeNumber || '';
       document.getElementById('complaintRakeManagerPhone').value = effective?.rakeManagerContact || effective?.rakeManagerPhone || '';
       document.getElementById('complaintTrainManager').value = effective?.trainManager || '';
+      if (!effective && rakeManager) {
+        const optionMaster = (appData.trainMasters || []).find(t => normalizeText(t.trainName) === normalizeText(trainName) && normalizeText(t.rakeManager) === normalizeText(rakeManager));
+        if (optionMaster) {
+          document.getElementById('complaintRakeNumber').value = optionMaster.rakeNumber || rakeNumber || '';
+          document.getElementById('complaintRakeManagerPhone').value = optionMaster.rakeManagerContact || optionMaster.rakeManagerPhone || '';
+          document.getElementById('complaintTrainManager').value = optionMaster.trainManager || '';
+          document.getElementById('complaintBusinessHead').value = optionMaster.businessHead || '';
+          document.getElementById('complaintVp').value = optionMaster.vp || '';
+          if (optionMaster.yard) document.getElementById('complaintYard').value = optionMaster.yard;
+          if (optionMaster.trainType) document.getElementById('complaintTrainType').value = optionMaster.trainType;
+          return;
+        }
+      }
       document.getElementById('complaintBusinessHead').value = effective?.businessHead || '';
       document.getElementById('complaintVp').value = effective?.vp || '';
       if (effective?.yard) document.getElementById('complaintYard').value = effective.yard;
@@ -7653,6 +7761,20 @@ function showPage(page) {
       downloadExcel(data, 'sales_gp_target_import_sample.xlsx');
     }
 
+    function downloadCurrentDaySalesEntries() {
+      const today = new Date().toISOString().split('T')[0];
+      const rows = (appData.sales || []).filter(s => getComparableDate(s.date) === today);
+      if (!rows.length) { showAlert('No sales entries found for today.', 'warning'); return; }
+      downloadExcel(rows, `sales_entries_today_${today}.xlsx`);
+    }
+
+    function downloadCurrentDayCashEntries() {
+      const today = new Date().toISOString().split('T')[0];
+      const rows = (appData.cash || []).filter(c => getComparableDate(c.date) === today);
+      if (!rows.length) { showAlert('No cash entries found for today.', 'warning'); return; }
+      downloadExcel(rows, `cash_entries_today_${today}.xlsx`);
+    }
+
     function downloadMasterData() { downloadExcel(appData.trainMasters, 'train_master_export.xlsx'); }
     function downloadSalesDashboardExcel() { downloadExcel(getFilteredSales(1), `sales_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); }
     function downloadComplaintDashboardExcel() { downloadExcel(getFilteredComplaints(1), `complaint_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); }
@@ -8047,6 +8169,8 @@ function showPage(page) {
     window.downloadCashSample = downloadCashSample;
     window.downloadMasterSample = downloadMasterSample;
     window.downloadMasterData = downloadMasterData;
+    window.downloadCurrentDaySalesEntries = downloadCurrentDaySalesEntries;
+    window.downloadCurrentDayCashEntries = downloadCurrentDayCashEntries;
     window.downloadSalesDashboardExcel = downloadSalesDashboardExcel;
     window.downloadComplaintDashboardExcel = downloadComplaintDashboardExcel;
     window.downloadCashDashboardExcel = downloadCashDashboardExcel;
