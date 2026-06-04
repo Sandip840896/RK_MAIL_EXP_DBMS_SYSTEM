@@ -2865,6 +2865,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!appData.sales) appData.sales = DEFAULT_DATA.sales;
       if (!appData.complaints) appData.complaints = DEFAULT_DATA.complaints;
       if (!appData.cash) appData.cash = DEFAULT_DATA.cash;
+      if (!appData.deletedRecords) appData.deletedRecords = {};
       if (!appData.users) appData.users = DEFAULT_DATA.users;
       hydrateManagerHierarchyFromMasters();
       ensureSystemUsers();
@@ -5918,6 +5919,7 @@ function showPage(page) {
       if (!ensureEditable('delete entries')) return;
       if (!confirm('Are you sure you want to delete this entry?')) return;
       appData.sales = appData.sales.filter(s => s.id != id);
+      markRecordDeleted('sales', id);
       saveData();
       loadSalesList();
       loadDashboard();
@@ -6028,6 +6030,16 @@ function showPage(page) {
       if (tab === 'list') loadComplaintList();
     }
 
+    function findDuplicateComplaint(referenceNo, complaintId, excludeId = null) {
+      const refKey = normalizeText(referenceNo);
+      const idKey = normalizeText(complaintId);
+      if (!refKey && !idKey) return null;
+      return (appData.complaints || []).find(c => c.id != excludeId && (
+        (refKey && normalizeText(c.referenceNo || c.complaintRefNo) === refKey) ||
+        (idKey && normalizeText(c.complaintId) === idKey)
+      ));
+    }
+
     function saveComplaint() {
       if (!ensureEditable('save entries')) return;
       const date = document.getElementById('complaintDate').value;
@@ -6049,8 +6061,8 @@ function showPage(page) {
       const trainNoForComplaint = document.getElementById('complaintTrainNo').value;
       const effective = getEffectiveMaster(trainNoForComplaint, trainName, date, rakeManager, document.getElementById('complaintRakeNumber').value);
       if (!effective) { showAlert('Complaint train must be listed in Train Manager Master.', 'error'); return; }
-      const duplicate = findDuplicateEntry(appData.complaints, date, trainNoForComplaint, trainName, editingId);
-      if (duplicate && !confirm('Complaint data is already available for same train number and date. Overwrite existing entry?')) return;
+      const duplicate = findDuplicateComplaint(referenceNo, document.getElementById('complaintId').value, editingId);
+      if (duplicate && !confirm('Complaint with same Reference No / Complaint ID already exists. Overwrite existing complaint?')) return;
       const complaint = {
         id: editingId || Date.now(),
         date: date,
@@ -6291,6 +6303,7 @@ function showPage(page) {
       if (!ensureEditable('delete entries')) return;
       if (!confirm('Are you sure you want to delete this complaint?')) return;
       appData.complaints = appData.complaints.filter(c => c.id != id);
+      markRecordDeleted('complaints', id);
       saveData();
       loadComplaintList();
       loadOpenComplaintQueue();
@@ -6517,6 +6530,7 @@ function showPage(page) {
       if (!ensureEditable('delete entries')) return;
       if (!confirm('Are you sure you want to delete this entry?')) return;
       appData.cash = appData.cash.filter(c => c.id != id);
+      markRecordDeleted('cash', id);
       saveData();
       loadCashList();
       loadCashDashboard();
@@ -7031,6 +7045,7 @@ function showPage(page) {
       if (user && user.email === 'sandipnandi2000@gmail.com') { showAlert('Cannot delete the primary super admin account', 'error'); return; }
       
       appData.users = appData.users.filter(u => u.id != id);
+      markRecordDeleted('users', id);
       saveData();
       loadUsersTable();
       showAlert('User deleted', 'success');
@@ -8016,10 +8031,29 @@ function showPage(page) {
       return `${date}|${train}|${ref}|${fallbackIndex}`;
     }
 
-    function mergeArrayByKey(cloudRows = [], localRows = []) {
+    function getDeletedSet(collectionName, ...sources) {
+      const ids = new Set();
+      sources.forEach(source => {
+        const records = source?.deletedRecords?.[collectionName] || {};
+        Object.keys(records || {}).forEach(id => ids.add(String(id)));
+      });
+      return ids;
+    }
+
+    function markRecordDeleted(collectionName, id) {
+      if (!appData.deletedRecords) appData.deletedRecords = {};
+      if (!appData.deletedRecords[collectionName]) appData.deletedRecords[collectionName] = {};
+      appData.deletedRecords[collectionName][String(id)] = new Date().toISOString();
+    }
+
+    function filterDeletedRows(rows = [], deletedSet = new Set()) {
+      return (Array.isArray(rows) ? rows : []).filter(row => !deletedSet.has(String(row?.id)));
+    }
+
+    function mergeArrayByKey(cloudRows = [], localRows = [], deletedSet = new Set()) {
       const merged = new Map();
-      (Array.isArray(cloudRows) ? cloudRows : []).forEach((item, index) => merged.set(makeRecordKey(item, index), item));
-      (Array.isArray(localRows) ? localRows : []).forEach((item, index) => merged.set(makeRecordKey(item, index), item));
+      filterDeletedRows(cloudRows, deletedSet).forEach((item, index) => merged.set(makeRecordKey(item, index), item));
+      filterDeletedRows(localRows, deletedSet).forEach((item, index) => merged.set(makeRecordKey(item, index), item));
       return [...merged.values()];
     }
 
@@ -8036,24 +8070,26 @@ function showPage(page) {
         targetMasters: source.targetMasters || [],
         sales: source.sales || [],
         complaints: source.complaints || [],
-        cash: source.cash || []
+        cash: source.cash || [],
+        deletedRecords: source.deletedRecords || {}
       };
     }
 
     function mergeCloudAndLocalData(cloudData = {}, localData = {}) {
       return {
-        users: mergeArrayByKey(cloudData.users, localData.users),
+        users: mergeArrayByKey(cloudData.users, localData.users, getDeletedSet('users', cloudData, localData)),
         yards: [...new Set([...(cloudData.yards || []), ...(localData.yards || [])])],
         clusterManagers: [...new Set([...(cloudData.clusterManagers || []), ...(localData.clusterManagers || [])])],
         trainManagers: [...new Set([...(cloudData.trainManagers || []), ...(localData.trainManagers || [])])],
         rakeManagers: [...new Set([...(cloudData.rakeManagers || []), ...(localData.rakeManagers || [])])],
         trainManagerHierarchy: { ...(cloudData.trainManagerHierarchy || {}), ...(localData.trainManagerHierarchy || {}) },
         rakeManagerHierarchy: { ...(cloudData.rakeManagerHierarchy || {}), ...(localData.rakeManagerHierarchy || {}) },
-        trainMasters: mergeArrayByKey(cloudData.trainMasters, localData.trainMasters),
-        targetMasters: mergeArrayByKey(cloudData.targetMasters, localData.targetMasters),
-        sales: mergeArrayByKey(cloudData.sales, localData.sales),
-        complaints: mergeArrayByKey(cloudData.complaints, localData.complaints),
-        cash: mergeArrayByKey(cloudData.cash, localData.cash)
+        trainMasters: mergeArrayByKey(cloudData.trainMasters, localData.trainMasters, getDeletedSet('trainMasters', cloudData, localData)),
+        targetMasters: mergeArrayByKey(cloudData.targetMasters, localData.targetMasters, getDeletedSet('targetMasters', cloudData, localData)),
+        sales: mergeArrayByKey(cloudData.sales, localData.sales, getDeletedSet('sales', cloudData, localData)),
+        complaints: mergeArrayByKey(cloudData.complaints, localData.complaints, getDeletedSet('complaints', cloudData, localData)),
+        cash: mergeArrayByKey(cloudData.cash, localData.cash, getDeletedSet('cash', cloudData, localData)),
+        deletedRecords: { ...(cloudData.deletedRecords || {}), ...(localData.deletedRecords || {}) }
       };
     }
 
