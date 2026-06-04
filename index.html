@@ -845,6 +845,33 @@
             </div>
           </div>
 
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">Train Manager Sales, GP and Salary Summary</h3>
+                <p class="card-subtitle">Accumulated by Train Manager for selected dashboard period</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('trainManagerSalesSummaryTable', 'train_manager_sales_gp_salary_summary')">
+                <i class="fas fa-file-excel"></i>
+              </button>
+            </div>
+            <div class="table-container">
+              <table id="trainManagerSalesSummaryTable">
+                <thead>
+                  <tr>
+                    <th>Train Manager</th>
+                    <th>Trains</th>
+                    <th>Entries</th>
+                    <th>Total Sale</th>
+                    <th>Total GP</th>
+                    <th>Total Manager Salary</th>
+                  </tr>
+                </thead>
+                <tbody id="trainManagerSalesSummaryBody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- Train Rank Table -->
           <div class="card" style="margin-top: 16px;">
             <div class="card-header">
@@ -1516,6 +1543,10 @@
                   <input type="text" id="complaintTrainManager" readonly>
                 </div>
                 <div class="form-field">
+                  <label>Train Manager Phone</label>
+                  <input type="text" id="complaintTrainManagerPhone" readonly>
+                </div>
+                <div class="form-field">
                   <label>Business Head</label>
                   <input type="text" id="complaintBusinessHead" readonly>
                 </div>
@@ -2163,10 +2194,21 @@
                 <datalist id="masterTrainManagerList"></datalist>
               </div>
               <div class="form-field">
+                <label>Train Manager Number</label>
+                <input type="text" id="masterTrainManagerPhone" placeholder="Train manager phone number">
+              </div>
+              <div class="form-field">
                 <label>Rake Manager</label>
                 <input type="text" id="masterRakeManager" list="masterRakeManagerList" placeholder="Type or choose rake manager">
                 <datalist id="masterRakeManagerList"></datalist>
               </div>
+              <div class="form-field">
+                <label>Rake Manager Number</label>
+                <input type="text" id="masterRakeManagerPhone" placeholder="Rake manager phone number">
+              </div>
+            </div>
+
+            <div class="form-row">
               <div class="form-field">
                 <label>Business Head</label>
                 <input type="text" id="masterBusinessHead" placeholder="Business head name">
@@ -2277,7 +2319,9 @@
                     <th>Type</th>
                     <th>Cluster</th>
                     <th>Manager</th>
+                    <th>Manager No</th>
                     <th>Rake Manager</th>
+                    <th>Rake Manager No</th>
                     <th>Business Head</th>
                     <th>VP</th>
                     <th>Valid From</th>
@@ -2294,7 +2338,9 @@
                     <th><select id="masterFilterType" onchange="loadMasterTable()"><option value="">All</option></select></th>
                     <th><select id="masterFilterCluster" onchange="loadMasterTable()"><option value="">All</option></select></th>
                     <th><select id="masterFilterManager" onchange="loadMasterTable()"><option value="">All</option></select></th>
+                    <th></th>
                     <th><select id="masterFilterRakeManager" onchange="loadMasterTable()"><option value="">All</option></select></th>
+                    <th></th>
                     <th><input id="masterFilterBusinessHead" placeholder="Filter" oninput="loadMasterTable()"></th>
                     <th><input id="masterFilterVp" placeholder="Filter" oninput="loadMasterTable()"></th>
                     <th><input id="masterFilterValidFrom" type="date" onchange="loadMasterTable()"></th>
@@ -3574,6 +3620,7 @@ function showPage(page) {
       // Render tables
       renderTopBottomTables(salesP1);
       renderManagerRankingTables(salesP1, complaints);
+      renderTrainManagerSalesSummary(salesP1);
       if (dateMode === 'comparison') {
         renderPeriodComparisonTable(salesP1, salesP2);
       } else {
@@ -4098,6 +4145,36 @@ function showPage(page) {
       };
       render('trainManagerRankTableBody', buildRows('trainManager'));
       render('rakeManagerRankTableBody', buildRows('rakeManager'));
+    }
+
+    function renderTrainManagerSalesSummary(sales) {
+      const tbody = document.getElementById('trainManagerSalesSummaryBody');
+      if (!tbody) return;
+      const groups = {};
+      sales.forEach(s => {
+        const manager = s.trainManager || 'Unassigned';
+        if (!groups[manager]) {
+          groups[manager] = { trains: new Set(), entries: 0, totalSale: 0, totalGp: 0, managerSalary: 0 };
+        }
+        if (s.trainName) groups[manager].trains.add(s.trainName);
+        groups[manager].entries += 1;
+        groups[manager].totalSale += Number(s.salesAchievement || s.totalSale) || 0;
+        groups[manager].totalGp += Number(s.gpAchievement) || 0;
+        groups[manager].managerSalary += Number(s.managerSalary) || 0;
+      });
+      const rows = Object.entries(groups)
+        .map(([manager, data]) => ({ manager, ...data, trainCount: data.trains.size }))
+        .sort((a, b) => b.totalSale - a.totalSale);
+      tbody.innerHTML = rows.length ? rows.map(r => `
+        <tr>
+          <td>${r.manager}</td>
+          <td>${r.trainCount}</td>
+          <td>${r.entries}</td>
+          <td>${formatCurrency(r.totalSale)}</td>
+          <td>${formatCurrency(r.totalGp)}</td>
+          <td>${formatCurrency(r.managerSalary)}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="6" style="text-align:center;color:#64748b;">No sales data available for selected period.</td></tr>';
     }
 
     function renderRankTable(sales, complaints, cash) {
@@ -6048,6 +6125,7 @@ function showPage(page) {
         document.getElementById('complaintRakeNumber').value = '';
         document.getElementById('complaintRakeManagerPhone').value = '';
         document.getElementById('complaintTrainManager').value = '';
+        document.getElementById('complaintTrainManagerPhone').value = '';
         document.getElementById('complaintBusinessHead').value = '';
         document.getElementById('complaintVp').value = '';
         return;
@@ -6070,12 +6148,14 @@ function showPage(page) {
       document.getElementById('complaintRakeNumber').value = effective?.rakeNumber || rakeNumber || '';
       document.getElementById('complaintRakeManagerPhone').value = effective?.rakeManagerContact || effective?.rakeManagerPhone || '';
       document.getElementById('complaintTrainManager').value = effective?.trainManager || '';
+      document.getElementById('complaintTrainManagerPhone').value = effective?.trainManagerContact || effective?.trainManagerPhone || '';
       if (!effective && rakeManager) {
         const optionMaster = (appData.trainMasters || []).find(t => normalizeText(t.trainName) === normalizeText(trainName) && normalizeText(t.rakeManager) === normalizeText(rakeManager));
         if (optionMaster) {
           document.getElementById('complaintRakeNumber').value = optionMaster.rakeNumber || rakeNumber || '';
           document.getElementById('complaintRakeManagerPhone').value = optionMaster.rakeManagerContact || optionMaster.rakeManagerPhone || '';
           document.getElementById('complaintTrainManager').value = optionMaster.trainManager || '';
+          document.getElementById('complaintTrainManagerPhone').value = optionMaster.trainManagerContact || optionMaster.trainManagerPhone || '';
           document.getElementById('complaintBusinessHead').value = optionMaster.businessHead || '';
           document.getElementById('complaintVp').value = optionMaster.vp || '';
           if (optionMaster.yard) document.getElementById('complaintYard').value = optionMaster.yard;
@@ -6146,6 +6226,7 @@ function showPage(page) {
         rakeNumber: document.getElementById('complaintRakeNumber').value || effective?.rakeNumber || '',
         rakeManagerContact: document.getElementById('complaintRakeManagerPhone').value || effective?.rakeManagerContact || effective?.rakeManagerPhone || '',
         trainManager: document.getElementById('complaintTrainManager').value || effective?.trainManager || '',
+        trainManagerContact: document.getElementById('complaintTrainManagerPhone').value || effective?.trainManagerContact || effective?.trainManagerPhone || '',
         businessHead: document.getElementById('complaintBusinessHead').value || effective?.businessHead || '',
         vp: document.getElementById('complaintVp').value || effective?.vp || '',
         complainantName: document.getElementById('complaintName').value,
@@ -6202,6 +6283,7 @@ function showPage(page) {
       document.getElementById('complaintRakeNumber').value = '';
       document.getElementById('complaintRakeManagerPhone').value = '';
       document.getElementById('complaintTrainManager').value = '';
+      document.getElementById('complaintTrainManagerPhone').value = '';
       document.getElementById('complaintBusinessHead').value = '';
       document.getElementById('complaintVp').value = '';
       document.getElementById('complaintName').value = '';
@@ -6349,6 +6431,8 @@ function showPage(page) {
       document.getElementById('complaintRakeManagerPhone').value = c.rakeManagerContact || c.rakeManagerPhone || '';
       if (!document.getElementById('complaintRakeManagerPhone').value) onComplaintRakeManagerChange();
       document.getElementById('complaintTrainManager').value = c.trainManager || '';
+      document.getElementById('complaintTrainManagerPhone').value = c.trainManagerContact || c.trainManagerPhone || '';
+      if (!document.getElementById('complaintTrainManagerPhone').value) onComplaintRakeManagerChange();
       document.getElementById('complaintBusinessHead').value = c.businessHead || '';
       document.getElementById('complaintVp').value = c.vp || '';
       document.getElementById('complaintName').value = c.complainantName || '';
@@ -6672,11 +6756,7 @@ function showPage(page) {
       const rakeList = document.getElementById('masterRakeManagerList');
       if (!rakeList) return;
       const allRakes = [...new Set([...(appData.rakeManagers || []), ...Object.keys(appData.rakeManagerHierarchy || {})])].sort();
-      const filtered = allRakes.filter(rm => {
-        const linkedTrainManager = appData.rakeManagerHierarchy?.[rm];
-        return !trainManager || !linkedTrainManager || linkedTrainManager === trainManager;
-      });
-      rakeList.innerHTML = filtered.map(rm => `<option value="${rm}"></option>`).join('');
+      rakeList.innerHTML = allRakes.map(rm => `<option value="${rm}"></option>`).join('');
     }
 
     function saveTrainMaster() {
@@ -6687,7 +6767,9 @@ function showPage(page) {
       const yard = document.getElementById('masterYard').value;
       const clusterManager = document.getElementById('masterClusterManager').value.trim();
       const trainManager = document.getElementById('masterTrainManager').value.trim();
+      const trainManagerContact = document.getElementById('masterTrainManagerPhone').value.trim();
       const rakeManager = document.getElementById('masterRakeManager').value.trim();
+      const rakeManagerContact = document.getElementById('masterRakeManagerPhone').value.trim();
       const businessHead = document.getElementById('masterBusinessHead').value.trim();
       const vp = document.getElementById('masterVp').value.trim();
       const validFrom = document.getElementById('masterValidFrom').value;
@@ -6705,11 +6787,6 @@ function showPage(page) {
         showAlert('Selected Train Manager reports to a different Cluster Manager. Please correct hierarchy.', 'error');
         return;
       }
-      if (rakeManager && trainManager && appData.rakeManagerHierarchy?.[rakeManager] && appData.rakeManagerHierarchy[rakeManager] !== trainManager) {
-        showAlert('Selected Rake Manager reports to a different Train Manager. Please correct hierarchy.', 'error');
-        return;
-      }
-
       ensureYardExists(yard);
 
       const train = {
@@ -6721,7 +6798,10 @@ function showPage(page) {
         trainType: document.getElementById('masterTrainType').value,
         clusterManager: clusterManager,
         trainManager: trainManager,
+        trainManagerContact: trainManagerContact,
         rakeManager: rakeManager,
+        rakeManagerContact: rakeManagerContact,
+        rakeManagerPhone: rakeManagerContact,
         businessHead: businessHead,
         vp: vp,
         salesTarget: Math.round(Number(document.getElementById('masterSalesTarget').value)) || 0,
@@ -6733,7 +6813,7 @@ function showPage(page) {
       if (clusterManager && !appData.clusterManagers.includes(clusterManager)) appData.clusterManagers.push(clusterManager);
       if (trainManager && !appData.trainManagers.includes(trainManager)) appData.trainManagers.push(trainManager);
       if (trainManager && clusterManager) appData.trainManagerHierarchy[trainManager] = clusterManager;
-      if (rakeManager && trainManager) appData.rakeManagerHierarchy[rakeManager] = trainManager;
+      if (rakeManager && trainManager && !appData.rakeManagerHierarchy[rakeManager]) appData.rakeManagerHierarchy[rakeManager] = trainManager;
       if (rakeManager && !appData.rakeManagers.includes(rakeManager)) appData.rakeManagers.push(rakeManager);
 
       if (editingId && editingType === 'master') {
@@ -6792,7 +6872,9 @@ function showPage(page) {
       onMasterClusterChange();
       document.getElementById('masterTrainManager').value = '';
       onMasterTrainManagerChange();
+      document.getElementById('masterTrainManagerPhone').value = '';
       document.getElementById('masterRakeManager').value = '';
+      document.getElementById('masterRakeManagerPhone').value = '';
       document.getElementById('masterBusinessHead').value = '';
       document.getElementById('masterVp').value = '';
       document.getElementById('masterSalesTarget').value = '';
@@ -6856,7 +6938,9 @@ function showPage(page) {
           <td>${t.trainType}</td>
           <td>${t.clusterManager || '-'}</td>
           <td>${t.trainManager || '-'}</td>
+          <td>${t.trainManagerContact || t.trainManagerPhone || '-'}</td>
           <td>${t.rakeManager || '-'}</td>
+          <td>${t.rakeManagerContact || t.rakeManagerPhone || '-'}</td>
           <td>${t.businessHead || '-'}</td>
           <td>${t.vp || '-'}</td>
           <td>${t.validFrom || '-'}</td>
@@ -6887,7 +6971,9 @@ function showPage(page) {
       onMasterClusterChange();
       document.getElementById('masterTrainManager').value = t.trainManager || '';
       onMasterTrainManagerChange();
+      document.getElementById('masterTrainManagerPhone').value = t.trainManagerContact || t.trainManagerPhone || '';
       document.getElementById('masterRakeManager').value = t.rakeManager || '';
+      document.getElementById('masterRakeManagerPhone').value = t.rakeManagerContact || t.rakeManagerPhone || '';
       document.getElementById('masterBusinessHead').value = t.businessHead || '';
       document.getElementById('masterVp').value = t.vp || '';
       document.getElementById('masterSalesTarget').value = Math.round(Number(t.salesTarget) || 0);
@@ -7709,6 +7795,7 @@ function showPage(page) {
         'Train Type': 'WCB',
         'Yard': 'Howrah',
         'Train Manager': 'Manager B',
+        'Train Manager Phone': '9000000001',
         'Business Head': 'Business Head A',
         'VP': 'VP A',
         'Complainant Details': 'John Doe',
@@ -7902,6 +7989,7 @@ function showPage(page) {
         'Train Number': c.trainNo || c.trainNumber || '',
         Yard: c.yard || '',
         'Train Manager': c.trainManager || '',
+        'Train Manager Phone': c.trainManagerContact || c.trainManagerPhone || '',
         'Rake Manager': c.rakeManager || '',
         'Rake Manager Phone': c.rakeManagerContact || c.rakeManagerPhone || '',
         'Rake Number': c.rakeNumber || '',
@@ -7932,6 +8020,7 @@ function showPage(page) {
         'Train Name': c.trainName || '',
         'Train Number': c.trainNumber || c.trainNo || '',
         'Train Manager': c.trainManager || '',
+        'Train Manager Phone': c.trainManagerContact || c.trainManagerPhone || '',
         'Rake Manager': c.rakeManager || '',
         'Amount To Be Collected': c.amountToCollect || c.gpFromSales || c.gpCollected || 0,
         'Cash Deposit': c.cashDepositCounter || 0,
