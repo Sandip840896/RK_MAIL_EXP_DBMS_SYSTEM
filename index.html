@@ -5997,14 +5997,18 @@ function showPage(page) {
 
     function selectComplaintTrain(id, name, number, type, yard) {
       const date = document.getElementById('complaintDate')?.value || '';
-      const effective = resolveSelectedTrainMaster(id, number, name, date);
-      document.getElementById('complaintTrainName').value = name;
-      document.getElementById('complaintTrainSearch').value = name;
+      const selected = (appData.trainMasters || []).find(t => t.id == id);
+      const effective = (hasRakeInfo(selected) ? selected : null) || resolveSelectedTrainMaster(id, number, name, date);
+      const effectiveNumber = effective?.trainNumber || number || '';
+      const effectiveName = effective?.trainName || name || '';
+      const effectiveRakeManager = effective?.rakeManager || '';
+      document.getElementById('complaintTrainName').value = effectiveName;
+      document.getElementById('complaintTrainSearch').value = effectiveName;
       document.getElementById('complaintTrainDropdown').classList.remove('active');
-      document.getElementById('complaintTrainNo').value = normalizeTrainNo(effective?.trainNumber || number) || effective?.trainNumber || number || '';
+      document.getElementById('complaintTrainNo').value = normalizeTrainNo(effectiveNumber) || effectiveNumber;
       document.getElementById('complaintTrainType').value = effective?.trainType || type || '';
       if (effective?.yard || yard) document.getElementById('complaintYard').value = effective?.yard || yard;
-      populateComplaintRakeManagers(number, name, '', id);
+      populateComplaintRakeManagers(effectiveNumber, effectiveName, effectiveRakeManager, id);
       onComplaintRakeManagerChange();
     }
 
@@ -6014,6 +6018,9 @@ function showPage(page) {
       const date = document.getElementById('complaintDate')?.value || '';
       const selectedMaster = resolveSelectedTrainMaster(selectedTrainId, trainNumber, trainName, date);
       let options = getRakeOptionsForTrain(trainNumber, trainName, date);
+      if (hasRakeInfo(selectedMaster) && !options.some(t => String(t.id) === String(selectedMaster.id))) {
+        options = [selectedMaster, ...options];
+      }
       if (!options.length && selectedMaster && (selectedMaster.rakeManager || selectedMaster.rakeNumber)) options = [selectedMaster];
       if (!options.length) options = getTrainMasterMatches(trainNumber, trainName).filter(hasRakeInfo);
       if (!options.length) {
