@@ -5881,10 +5881,13 @@ function showPage(page) {
       if (currentUser.yard !== 'ALL') filtered = filtered.filter(s => s.yard === currentUser.yard);
 
       filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
-      const rowActions = (id) => isReadOnlyUser()
-        ? '<span style="font-size:11px;color:#64748b;">View only</span>'
-        : `<button class="btn-icon edit" onclick="editSalesEntry(${id})"><i class="fas fa-edit"></i></button>
-           <button class="btn-icon delete" onclick="deleteSalesEntry(${id})"><i class="fas fa-trash"></i></button>`;
+      const rowActions = (id) => {
+        const safeId = String(id).replace(/'/g, "\\'");
+        return isReadOnlyUser()
+          ? '<span style="font-size:11px;color:#64748b;">View only</span>'
+          : `<button class="btn-icon edit" onclick="editSalesEntry('${safeId}')"><i class="fas fa-edit"></i></button>
+             <button class="btn-icon delete" onclick="deleteSalesEntry('${safeId}')"><i class="fas fa-trash"></i></button>`;
+      };
 
       document.getElementById('salesTableBody').innerHTML = filtered.map(s => `
         <tr>
@@ -5923,9 +5926,12 @@ function showPage(page) {
 
     function deleteSalesEntry(id) {
       if (!ensureEditable('delete entries')) return;
+      const entry = (appData.sales || []).find(s => String(s.id) === String(id));
+      if (!entry) { showAlert('Sales entry not found. Please refresh and try again.', 'error'); return; }
       if (!confirm('Are you sure you want to delete this entry?')) return;
-      appData.sales = appData.sales.filter(s => s.id != id);
-      markRecordDeleted('sales', id);
+      markRecordDeleted('sales', entry.id);
+      markRecordDeleted('sales', makeRecordKey(entry, 'sales'));
+      appData.sales = appData.sales.filter(s => String(s.id) !== String(id));
       saveData();
       loadSalesList();
       loadDashboard();
@@ -8053,7 +8059,9 @@ function showPage(page) {
     }
 
     function filterDeletedRows(rows = [], deletedSet = new Set()) {
-      return (Array.isArray(rows) ? rows : []).filter(row => !deletedSet.has(String(row?.id)));
+      return (Array.isArray(rows) ? rows : []).filter((row, index) =>
+        !deletedSet.has(String(row?.id)) && !deletedSet.has(makeRecordKey(row, index)) && !deletedSet.has(makeRecordKey(row, 'sales'))
+      );
     }
 
     function mergeArrayByKey(cloudRows = [], localRows = [], deletedSet = new Set()) {
