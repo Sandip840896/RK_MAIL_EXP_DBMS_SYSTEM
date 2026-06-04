@@ -4165,6 +4165,13 @@ function showPage(page) {
       });
     }
 
+    function getPreferredTrainMasterMatches(trainNumber, trainName) {
+      const matched = getTrainMasterMatches(trainNumber, trainName);
+      const nameKey = normalizeText(trainName);
+      const exactNameMatches = nameKey ? matched.filter(t => normalizeText(t.trainName) === nameKey) : [];
+      return exactNameMatches.length ? exactNameMatches : matched;
+    }
+
     function hasRakeInfo(master) {
       return !!(master && (String(master.rakeManager || '').trim() || String(master.rakeNumber || '').trim()));
     }
@@ -4188,7 +4195,7 @@ function showPage(page) {
       const rakeOptions = getRakeOptionsForTrain(lookupNumber, lookupName, dateValue);
       if (rakeOptions.length) return rakeOptions[0];
 
-      const matchedWithRake = getTrainMasterMatches(lookupNumber, lookupName).find(hasRakeInfo);
+      const matchedWithRake = getPreferredTrainMasterMatches(lookupNumber, lookupName).find(hasRakeInfo);
       if (matchedWithRake) return matchedWithRake;
 
       return getEffectiveMaster(lookupNumber, lookupName, dateValue, selected?.rakeManager, selected?.rakeNumber) || selected;
@@ -4196,7 +4203,7 @@ function showPage(page) {
 
     function getEffectiveMaster(trainNumber, trainName, dateValue, rakeManager = '', rakeNumber = '') {
       const day = getComparableDate(dateValue);
-      const matched = getTrainMasterMatches(trainNumber, trainName);
+      const matched = getPreferredTrainMasterMatches(trainNumber, trainName);
 
       if (!matched.length) return null;
       const valid = matched.filter(t => {
@@ -4245,18 +4252,18 @@ function showPage(page) {
       if (target && Number(target.gpTarget)) return Math.round(Number(target.gpTarget) || 0);
       const effective = getEffectiveMaster(trainNumber, trainName, dateValue);
       if (effective && Number(effective.gpTarget)) return Math.round(Number(effective.gpTarget) || 0);
-      const match = getTrainMasterMatches(trainNumber, trainName).find(t => Number(t.gpTarget));
+      const match = getPreferredTrainMasterMatches(trainNumber, trainName).find(t => Number(t.gpTarget));
       return Math.round(Number(match?.gpTarget) || 0);
     }
 
     function applyGpTargetToTrain(trainNumber, trainName, gpTarget) {
-      const matches = getTrainMasterMatches(trainNumber, trainName);
+      const matches = getPreferredTrainMasterMatches(trainNumber, trainName);
       matches.forEach(t => { t.gpTarget = Math.round(Number(gpTarget) || 0); });
     }
 
     function getRakeOptionsForTrain(trainNumber, trainName, dateValue) {
       const day = getComparableDate(dateValue);
-      return getTrainMasterMatches(trainNumber, trainName)
+      return getPreferredTrainMasterMatches(trainNumber, trainName)
         .filter(t => {
           if (!day) return true;
           if (t.validFrom && day < t.validFrom) return false;
@@ -6022,7 +6029,7 @@ function showPage(page) {
         options = [selectedMaster, ...options];
       }
       if (!options.length && selectedMaster && (selectedMaster.rakeManager || selectedMaster.rakeNumber)) options = [selectedMaster];
-      if (!options.length) options = getTrainMasterMatches(trainNumber, trainName).filter(hasRakeInfo);
+      if (!options.length) options = getPreferredTrainMasterMatches(trainNumber, trainName).filter(hasRakeInfo);
       if (!options.length) {
         select.innerHTML = '<option value="">No rake manager found in master</option>';
         document.getElementById('complaintRakeNumber').value = '';
