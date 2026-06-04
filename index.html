@@ -4165,10 +4165,33 @@ function showPage(page) {
       });
     }
 
+    function hasRakeInfo(master) {
+      return !!(master && (String(master.rakeManager || '').trim() || String(master.rakeNumber || '').trim()));
+    }
+
+    function getSortedTrainMastersForSelection() {
+      return [...(appData.trainMasters || [])].sort((a, b) => {
+        const rakeRank = (hasRakeInfo(b) ? 1 : 0) - (hasRakeInfo(a) ? 1 : 0);
+        if (rakeRank) return rakeRank;
+        const nameRank = String(a.trainName || '').localeCompare(String(b.trainName || ''));
+        if (nameRank) return nameRank;
+        return String(a.rakeNumber || '').localeCompare(String(b.rakeNumber || ''));
+      });
+    }
+
     function resolveSelectedTrainMaster(trainId, trainNumber, trainName, dateValue) {
       const selected = trainId ? (appData.trainMasters || []).find(t => t.id == trainId) : null;
-      if (selected && (selected.rakeManager || selected.rakeNumber || selected.trainManager)) return selected;
-      return getEffectiveMaster(trainNumber || selected?.trainNumber, trainName || selected?.trainName, dateValue, selected?.rakeManager, selected?.rakeNumber) || selected;
+      if (hasRakeInfo(selected)) return selected;
+
+      const lookupNumber = trainNumber || selected?.trainNumber || '';
+      const lookupName = trainName || selected?.trainName || '';
+      const rakeOptions = getRakeOptionsForTrain(lookupNumber, lookupName, dateValue);
+      if (rakeOptions.length) return rakeOptions[0];
+
+      const matchedWithRake = getTrainMasterMatches(lookupNumber, lookupName).find(hasRakeInfo);
+      if (matchedWithRake) return matchedWithRake;
+
+      return getEffectiveMaster(lookupNumber, lookupName, dateValue, selected?.rakeManager, selected?.rakeNumber) || selected;
     }
 
     function getEffectiveMaster(trainNumber, trainName, dateValue, rakeManager = '', rakeNumber = '') {
@@ -5478,11 +5501,11 @@ function showPage(page) {
     }
 
     function populateTrainDropdowns() {
-      const trains = appData.trainMasters || [];
+      const trains = getSortedTrainMastersForSelection();
       const dropdown = document.getElementById('trainDropdown');
       dropdown.innerHTML = trains.map(t => `
         <div class="searchable-dropdown-item" onclick="selectTrain('${t.id}', '${t.trainName}', '${t.trainNumber}')">
-          ${t.trainName} (${t.trainNumber})${t.rakeNumber ? ' - ' + t.rakeNumber : ''}
+          ${t.trainName} (${t.trainNumber})${t.rakeNumber ? ' - ' + t.rakeNumber : ''}${t.rakeManager ? ' - ' + t.rakeManager : ''}
         </div>
       `).join('');
     }
@@ -5529,14 +5552,18 @@ function showPage(page) {
       
       const train = appData.trainMasters.find(t => t.id == id);
       if (train) {
-        document.getElementById('salesTrainNo').value = normalizeTrainNo(train.trainNumber) || train.trainNumber || '';
-        document.getElementById('salesYard').value = train.yard;
-        document.getElementById('salesClusterManager').value = train.clusterManager || '';
-        document.getElementById('salesTrainManager').value = train.trainManager || '';
-        document.getElementById('salesRakeManager').value = train.rakeManager || '';
-        document.getElementById('salesTrainType').value = train.trainType || '';
-        document.getElementById('salesTarget').value = Math.round(Number(train.salesTarget) || 0);
-        document.getElementById('salesGpTarget').value = getTrainGpTarget(train.trainNumber, train.trainName, document.getElementById('salesDate')?.value);
+        const saleDate = document.getElementById('salesDate')?.value || '';
+        const effective = resolveSelectedTrainMaster(id, train.trainNumber, train.trainName, saleDate) || train;
+        const effectiveNumber = effective.trainNumber || train.trainNumber || '';
+        const effectiveName = effective.trainName || train.trainName || '';
+        document.getElementById('salesTrainNo').value = normalizeTrainNo(effectiveNumber) || effectiveNumber;
+        document.getElementById('salesYard').value = effective.yard || train.yard || '';
+        document.getElementById('salesClusterManager').value = effective.clusterManager || train.clusterManager || '';
+        document.getElementById('salesTrainManager').value = effective.trainManager || train.trainManager || '';
+        document.getElementById('salesRakeManager').value = effective.rakeManager || train.rakeManager || '';
+        document.getElementById('salesTrainType').value = effective.trainType || train.trainType || '';
+        document.getElementById('salesTarget').value = getTrainSalesTarget(effectiveNumber, effectiveName, saleDate);
+        document.getElementById('salesGpTarget').value = getTrainGpTarget(effectiveNumber, effectiveName, saleDate);
         refreshSalesTargetForDate();
       }
     }
@@ -5952,11 +5979,11 @@ function showPage(page) {
     }
 
     function populateComplaintTrainDropdown() {
-      const trains = appData.trainMasters || [];
+      const trains = getSortedTrainMastersForSelection();
       const dropdown = document.getElementById('complaintTrainDropdown');
       dropdown.innerHTML = trains.map(t => `
         <div class="searchable-dropdown-item" onclick="selectComplaintTrain('${t.id}', '${t.trainName}', '${t.trainNumber}', '${t.trainType || ''}', '${t.yard || ''}')">
-          ${t.trainName} (${t.trainNumber})${t.rakeNumber ? ' - ' + t.rakeNumber : ''}
+          ${t.trainName} (${t.trainNumber})${t.rakeNumber ? ' - ' + t.rakeNumber : ''}${t.rakeManager ? ' - ' + t.rakeManager : ''}
         </div>
       `).join('');
     }
@@ -5969,12 +5996,14 @@ function showPage(page) {
     function showComplaintTrainDropdown() { document.getElementById('complaintTrainDropdown').classList.add('active'); }
 
     function selectComplaintTrain(id, name, number, type, yard) {
+      const date = document.getElementById('complaintDate')?.value || '';
+      const effective = resolveSelectedTrainMaster(id, number, name, date);
       document.getElementById('complaintTrainName').value = name;
       document.getElementById('complaintTrainSearch').value = name;
       document.getElementById('complaintTrainDropdown').classList.remove('active');
-      document.getElementById('complaintTrainNo').value = normalizeTrainNo(number) || number || '';
-      document.getElementById('complaintTrainType').value = type;
-      if (yard) document.getElementById('complaintYard').value = yard;
+      document.getElementById('complaintTrainNo').value = normalizeTrainNo(effective?.trainNumber || number) || effective?.trainNumber || number || '';
+      document.getElementById('complaintTrainType').value = effective?.trainType || type || '';
+      if (effective?.yard || yard) document.getElementById('complaintYard').value = effective?.yard || yard;
       populateComplaintRakeManagers(number, name, '', id);
       onComplaintRakeManagerChange();
     }
@@ -5986,7 +6015,7 @@ function showPage(page) {
       const selectedMaster = resolveSelectedTrainMaster(selectedTrainId, trainNumber, trainName, date);
       let options = getRakeOptionsForTrain(trainNumber, trainName, date);
       if (!options.length && selectedMaster && (selectedMaster.rakeManager || selectedMaster.rakeNumber)) options = [selectedMaster];
-      if (!options.length && trainName) options = (appData.trainMasters || []).filter(t => normalizeText(t.trainName) === normalizeText(trainName) && (t.rakeManager || t.rakeNumber));
+      if (!options.length) options = getTrainMasterMatches(trainNumber, trainName).filter(hasRakeInfo);
       if (!options.length) {
         select.innerHTML = '<option value="">No rake manager found in master</option>';
         document.getElementById('complaintRakeNumber').value = '';
@@ -6001,6 +6030,7 @@ function showPage(page) {
         return `<option value="${t.rakeManager || ''}" data-rake-number="${t.rakeNumber || ''}">${label}</option>`;
       }).join('');
       if (selectedRakeManager) select.value = selectedRakeManager;
+      if (!select.value && selectedMaster?.rakeManager) select.value = selectedMaster.rakeManager || '';
       if (!select.value && options.length === 1) select.value = options[0].rakeManager || '';
     }
 
@@ -6329,10 +6359,10 @@ function showPage(page) {
       loadCashDashboard();
       
       const dropdown = document.getElementById('cashTrainDropdown');
-      const trains = appData.trainMasters || [];
+      const trains = getSortedTrainMastersForSelection();
       dropdown.innerHTML = trains.map(t => `
         <div class="searchable-dropdown-item" onclick="selectCashTrain('${t.id}', '${t.trainName}', '${t.trainNumber}')">
-          ${t.trainName} (${t.trainNumber})${t.rakeNumber ? ' - ' + t.rakeNumber : ''}
+          ${t.trainName} (${t.trainNumber})${t.rakeNumber ? ' - ' + t.rakeNumber : ''}${t.rakeManager ? ' - ' + t.rakeManager : ''}
         </div>
       `).join('');
 
