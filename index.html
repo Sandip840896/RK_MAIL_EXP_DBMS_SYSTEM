@@ -1390,8 +1390,8 @@
                 </div>
               </div>
               <div class="action-btns" style="justify-content:flex-end; margin: 0 0 12px;">
-                <button class="btn btn-success btn-sm" onclick="downloadCurrentDaySalesEntries()">
-                  <i class="fas fa-file-excel"></i> Download Today's Sales
+                <button class="btn btn-success btn-sm" onclick="downloadSalesEntries()">
+                  <i class="fas fa-file-excel"></i> Download Sales Entry
                 </button>
               </div>
               <div class="table-container">
@@ -1687,6 +1687,11 @@
                     <option value="">All Yards</option>
                   </select>
                 </div>
+              </div>
+              <div class="action-btns" style="justify-content:flex-end; margin: 0 0 12px;">
+                <button class="btn btn-success btn-sm" onclick="downloadComplaintEntries()">
+                  <i class="fas fa-file-excel"></i> Download Complaint Entry
+                </button>
               </div>
               <div class="table-container">
                 <table id="complaintTable">
@@ -2029,8 +2034,8 @@
                 </div>
               </div>
               <div class="action-btns" style="justify-content:flex-end; margin: 0 0 12px;">
-                <button class="btn btn-success btn-sm" onclick="downloadCurrentDayCashEntries()">
-                  <i class="fas fa-file-excel"></i> Download Today's Cash
+                <button class="btn btn-success btn-sm" onclick="downloadCashEntries()">
+                  <i class="fas fa-file-excel"></i> Download Cash Entry
                 </button>
               </div>
               <div class="table-container">
@@ -5900,7 +5905,7 @@ function showPage(page) {
       document.getElementById('remarksRequired').style.display = 'none';
     }
 
-    function loadSalesList() {
+    function getFilteredSalesEntriesFromListFilters() {
       const fromDate = document.getElementById('salesFilterFrom').value;
       const toDate = document.getElementById('salesFilterTo').value;
       const trainFilter = document.getElementById('salesFilterTrain').value;
@@ -5918,6 +5923,11 @@ function showPage(page) {
       if (currentUser.yard !== 'ALL') filtered = filtered.filter(s => s.yard === currentUser.yard);
 
       filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+      return filtered;
+    }
+
+    function loadSalesList() {
+      const filtered = getFilteredSalesEntriesFromListFilters();
       const rowActions = (id) => {
         const safeId = String(id).replace(/'/g, "\\'");
         return isReadOnlyUser()
@@ -6210,7 +6220,7 @@ function showPage(page) {
       document.getElementById('complaintRemarks').value = '';
     }
 
-    function loadComplaintList() {
+    function getFilteredComplaintEntriesFromListFilters() {
       const fromDate = document.getElementById('complaintFilterFrom').value;
       const toDate = document.getElementById('complaintFilterTo').value;
       const statusFilter = document.getElementById('complaintFilterStatus').value;
@@ -6228,6 +6238,11 @@ function showPage(page) {
       if (currentUser.yard !== 'ALL') filtered = filtered.filter(c => c.yard === currentUser.yard);
 
       filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+      return filtered;
+    }
+
+    function loadComplaintList() {
+      const filtered = getFilteredComplaintEntriesFromListFilters();
       const rowActions = (id) => isReadOnlyUser()
         ? '<span style="font-size:11px;color:#64748b;">View only</span>'
         : `<button class="btn-icon edit" onclick="editComplaint(${id})"><i class="fas fa-edit"></i></button>
@@ -6511,7 +6526,7 @@ function showPage(page) {
       document.getElementById('shortageReasonRow').style.display = 'none';
     }
 
-    function loadCashList() {
+    function getFilteredCashEntriesFromListFilters() {
       const fromDate = document.getElementById('cashFilterFrom').value;
       const toDate = document.getElementById('cashFilterTo').value;
       const yardFilter = document.getElementById('cashFilterYard').value;
@@ -6527,6 +6542,11 @@ function showPage(page) {
       if (currentUser.yard !== 'ALL') filtered = filtered.filter(c => c.yard === currentUser.yard);
 
       filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+      return filtered;
+    }
+
+    function loadCashList() {
+      const filtered = getFilteredCashEntriesFromListFilters();
       const rowActions = (id) => isReadOnlyUser()
         ? '<span style="font-size:11px;color:#64748b;">View only</span>'
         : `<button class="btn-icon edit" onclick="editCashEntry(${id})"><i class="fas fa-edit"></i></button>
@@ -7833,18 +7853,95 @@ function showPage(page) {
       downloadExcel(data, 'sales_gp_target_import_sample.xlsx');
     }
 
-    function downloadCurrentDaySalesEntries() {
-      const today = new Date().toISOString().split('T')[0];
-      const rows = (appData.sales || []).filter(s => getComparableDate(s.date) === today);
-      if (!rows.length) { showAlert('No sales entries found for today.', 'warning'); return; }
-      downloadExcel(rows, `sales_entries_today_${today}.xlsx`);
+    function getListExportSuffix(prefix, fromId, toId) {
+      const from = document.getElementById(fromId)?.value || '';
+      const to = document.getElementById(toId)?.value || '';
+      if (from && to) return `${prefix}_${from}_to_${to}.xlsx`;
+      if (from) return `${prefix}_from_${from}.xlsx`;
+      if (to) return `${prefix}_to_${to}.xlsx`;
+      return `${prefix}_all.xlsx`;
     }
 
-    function downloadCurrentDayCashEntries() {
-      const today = new Date().toISOString().split('T')[0];
-      const rows = (appData.cash || []).filter(c => getComparableDate(c.date) === today);
-      if (!rows.length) { showAlert('No cash entries found for today.', 'warning'); return; }
-      downloadExcel(rows, `cash_entries_today_${today}.xlsx`);
+    function downloadSalesEntries() {
+      const rows = getFilteredSalesEntriesFromListFilters();
+      if (!rows.length) { showAlert('No sales entries found for selected filters.', 'warning'); return; }
+      const exportRows = rows.map(s => ({
+        Date: s.date || '',
+        Yard: s.yard || '',
+        'Train Name': s.trainName || '',
+        'Train Number': s.trainNumber || s.trainNo || '',
+        'Train Manager': s.trainManager || '',
+        'Rake Manager': s.rakeManager || '',
+        'Sales Target': s.salesTarget || 0,
+        'Total Sale': s.salesAchievement || s.totalSale || 0,
+        'Store Bill': s.storeBill || 0,
+        'Base Expenses': s.baseExpense || 0,
+        'Credit Expenses': s.creditExpense || 0,
+        'Cash Expenses': s.cashExpense || 0,
+        'MISC Expenses': s.miscExpense || 0,
+        Commission: s.cashCommission || 0,
+        'Staff Salary': s.staffSalary || 0,
+        'Manager Salary': s.managerSalary || 0,
+        'E-Catering': s.eCatering || 0,
+        'GP Target': s.gpTarget || 0,
+        'GP Achievement': s.gpAchievement || 0,
+        Remarks: s.remarks || ''
+      }));
+      downloadExcel(exportRows, getListExportSuffix('sales_entries', 'salesFilterFrom', 'salesFilterTo'));
+    }
+
+    function downloadComplaintEntries() {
+      const rows = getFilteredComplaintEntriesFromListFilters();
+      if (!rows.length) { showAlert('No complaint entries found for selected filters.', 'warning'); return; }
+      const exportRows = rows.map(c => ({
+        Date: c.date || '',
+        Status: c.status || '',
+        'Complaint ID': c.complaintId || '',
+        Source: c.source || '',
+        'Train Name': c.trainName || '',
+        'Train Number': c.trainNo || c.trainNumber || '',
+        Yard: c.yard || '',
+        'Train Manager': c.trainManager || '',
+        'Rake Manager': c.rakeManager || '',
+        'Rake Manager Phone': c.rakeManagerContact || c.rakeManagerPhone || '',
+        'Rake Number': c.rakeNumber || '',
+        'Customer Mobile': c.mobileNo || '',
+        'Reference No': c.referenceNo || '',
+        'PNR / UTS': c.pnrNo || '',
+        'Coach No': c.coachNo || '',
+        'Physical Coach No': c.physicalCoachNo || '',
+        'Berth No': c.berthNo || '',
+        'Complain Nature': c.complainNature || '',
+        Description: c.details || '',
+        'Action Taken 1': c.actionTaken1 || '',
+        'Action Taken 2': c.actionTaken2 || '',
+        'Action Taken 3': c.actionTaken3 || '',
+        'Action Taken 4': c.actionTaken4 || '',
+        'Action Taken 5': c.actionTaken5 || '',
+        Remarks: c.remarks || ''
+      }));
+      downloadExcel(exportRows, getListExportSuffix('complaint_entries', 'complaintFilterFrom', 'complaintFilterTo'));
+    }
+
+    function downloadCashEntries() {
+      const rows = getFilteredCashEntriesFromListFilters();
+      if (!rows.length) { showAlert('No cash entries found for selected filters.', 'warning'); return; }
+      const exportRows = rows.map(c => ({
+        Date: c.date || '',
+        Yard: c.yard || '',
+        'Train Name': c.trainName || '',
+        'Train Number': c.trainNumber || c.trainNo || '',
+        'Train Manager': c.trainManager || '',
+        'Rake Manager': c.rakeManager || '',
+        'Amount To Be Collected': c.amountToCollect || c.gpFromSales || c.gpCollected || 0,
+        'Cash Deposit': c.cashDepositCounter || 0,
+        'Online Deposit': c.onlineDeposit || 0,
+        'Total Deposit': c.totalDeposit || 0,
+        'Balance Due': c.balanceDue || Math.max((Number(c.amountToCollect || c.gpFromSales || c.gpCollected) || 0) - (Number(c.totalDeposit) || 0), 0),
+        'Shortage Reason': c.shortageReason || '',
+        Remarks: c.remarks || ''
+      }));
+      downloadExcel(exportRows, getListExportSuffix('cash_entries', 'cashFilterFrom', 'cashFilterTo'));
     }
 
     function downloadMasterData() { downloadExcel(appData.trainMasters, 'train_master_export.xlsx'); }
@@ -8264,8 +8361,9 @@ function showPage(page) {
     window.downloadCashSample = downloadCashSample;
     window.downloadMasterSample = downloadMasterSample;
     window.downloadMasterData = downloadMasterData;
-    window.downloadCurrentDaySalesEntries = downloadCurrentDaySalesEntries;
-    window.downloadCurrentDayCashEntries = downloadCurrentDayCashEntries;
+    window.downloadSalesEntries = downloadSalesEntries;
+    window.downloadComplaintEntries = downloadComplaintEntries;
+    window.downloadCashEntries = downloadCashEntries;
     window.downloadSalesDashboardExcel = downloadSalesDashboardExcel;
     window.downloadComplaintDashboardExcel = downloadComplaintDashboardExcel;
     window.downloadCashDashboardExcel = downloadCashDashboardExcel;
