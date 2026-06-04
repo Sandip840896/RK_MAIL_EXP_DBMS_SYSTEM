@@ -2255,6 +2255,7 @@
 
           <div class="card">
             <h3 class="card-title">Master Values Management</h3>
+            <p class="card-subtitle">Optional quick-add for suggestion lists. Train/rake mapping is controlled by the Train Master row above.</p>
             <div class="master-values-grid">
               <div>
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; color: #475569; font-weight: 500;">Add New Yard</label>
@@ -2277,7 +2278,6 @@
               <div>
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; color: #475569; font-weight: 500;">Add Train Manager</label>
                 <div class="inline-control">
-                  <select id="newTrainManagerCluster" style="flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; color: #1e293b; font-size: 14px;"></select>
                   <input type="text" id="newTrainManager" placeholder="Manager name" style="flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; color: #1e293b; font-size: 14px;">
                   <button class="btn btn-success btn-sm" onclick="addTrainManager()">
                     <i class="fas fa-plus"></i>
@@ -2287,7 +2287,6 @@
               <div>
                 <label style="display: block; margin-bottom: 6px; font-size: 12px; color: #475569; font-weight: 500;">Add Rake Manager</label>
                 <div class="inline-control">
-                  <select id="newRakeManagerTrain" style="flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; color: #1e293b; font-size: 14px;"></select>
                   <input type="text" id="newRakeManager" placeholder="Rake manager name" style="flex: 1; padding: 10px 12px; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; color: #1e293b; font-size: 14px;">
                   <button class="btn btn-success btn-sm" onclick="addRakeManager()">
                     <i class="fas fa-plus"></i>
@@ -7015,29 +7014,25 @@ function showPage(page) {
     function addTrainManager() {
       if (!ensureEditable('add master data')) return;
       const manager = document.getElementById('newTrainManager').value.trim();
-      const cluster = document.getElementById('newTrainManagerCluster').value;
-      if (!manager || !cluster) { showAlert('Select cluster manager and enter train manager name', 'error'); return; }
+      if (!manager) { showAlert('Enter train manager name', 'error'); return; }
       if (!appData.trainManagers.includes(manager)) {
         appData.trainManagers.push(manager);
       }
-      appData.trainManagerHierarchy[manager] = cluster;
       saveData();
       loadMastersPage();
       document.getElementById('newTrainManager').value = '';
-      showAlert('Train manager added with reporting hierarchy', 'success');
+      showAlert('Train manager added to suggestion list', 'success');
     }
 
     function addRakeManager() {
       if (!ensureEditable('add master data')) return;
       const name = document.getElementById('newRakeManager').value.trim();
-      const trainManager = document.getElementById('newRakeManagerTrain').value;
-      if (!name || !trainManager) { showAlert('Select train manager and enter rake manager name', 'error'); return; }
+      if (!name) { showAlert('Enter rake manager name', 'error'); return; }
       if (!appData.rakeManagers.includes(name)) appData.rakeManagers.push(name);
-      appData.rakeManagerHierarchy[name] = trainManager;
       saveData();
       loadMastersPage();
       document.getElementById('newRakeManager').value = '';
-      showAlert('Rake manager added with reporting hierarchy', 'success');
+      showAlert('Rake manager added to suggestion list', 'success');
     }
 
     // ==================== USERS PAGE FUNCTIONS ====================
