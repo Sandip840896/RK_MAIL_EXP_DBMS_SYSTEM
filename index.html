@@ -848,10 +848,10 @@
           <div class="card" style="margin-top: 16px;">
             <div class="card-header">
               <div>
-                <h3 class="card-title">Train Manager Sales, GP and Salary Summary</h3>
-                <p class="card-subtitle">Accumulated by Train Manager for selected dashboard period</p>
+                <h3 class="card-title">Rake Manager Sales, GP and Salary Summary</h3>
+                <p class="card-subtitle">Accumulated by Rake Manager for selected dashboard period</p>
               </div>
-              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('trainManagerSalesSummaryTable', 'train_manager_sales_gp_salary_summary')">
+              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('trainManagerSalesSummaryTable', 'rake_manager_sales_gp_salary_summary')">
                 <i class="fas fa-file-excel"></i>
               </button>
             </div>
@@ -859,12 +859,12 @@
               <table id="trainManagerSalesSummaryTable">
                 <thead>
                   <tr>
-                    <th>Train Manager</th>
+                    <th>Rake Manager</th>
                     <th>Trains</th>
                     <th>Entries</th>
                     <th>Total Sale</th>
                     <th>Total GP</th>
-                    <th>Total Manager Salary</th>
+                    <th>Total Rake Manager Salary</th>
                   </tr>
                 </thead>
                 <tbody id="trainManagerSalesSummaryBody"></tbody>
@@ -1346,7 +1346,7 @@
                   <input type="number" id="salesStaffSalary" oninput="calculateSalesCostsAndGp()">
                 </div>
                 <div class="form-field">
-                  <label>Manager Salary</label>
+                  <label>Rake Manager Salary</label>
                   <input type="number" id="salesManagerSalary" oninput="calculateSalesCostsAndGp()">
                 </div>
                 <div class="form-field">
@@ -4152,7 +4152,7 @@ function showPage(page) {
       if (!tbody) return;
       const groups = {};
       sales.forEach(s => {
-        const manager = s.trainManager || 'Unassigned';
+        const manager = s.rakeManager || 'Unassigned';
         if (!groups[manager]) {
           groups[manager] = { trains: new Set(), entries: 0, totalSale: 0, totalGp: 0, managerSalary: 0 };
         }
@@ -7341,7 +7341,7 @@ function showPage(page) {
           const miscExpense = Math.round(Number(getColumnValue(row, ['MISC Expenses', 'MISC Expense', 'miscexpense', 'Misc Expense']))) || 0;
           const cashCommission = Math.round(Number(getColumnValue(row, ['Commission', 'Cash Commission', 'cashcommission']))) || Math.round(salesAchievement * 0.10);
           const staffSalary = Math.round(Number(getColumnValue(row, ['Staff Salary', 'staffsalary']))) || 0;
-          const managerSalary = Math.round(Number(getColumnValue(row, ['Manager Salary', 'managersalary']))) || 0;
+          const managerSalary = Math.round(Number(getColumnValue(row, ['Rake Manager Salary', 'rakemanagersalary', 'Manager Salary', 'managersalary']))) || 0;
           const eCatering = Math.round(Number(getColumnValue(row, ['E-Catering', 'ECatering', 'eCatering']))) || 0;
           const importedGp = Number(getColumnValue(row, ['Gross Profit Achievement', 'grossprofitachievement', 'gpachievement'])) || 0;
           const gpAchievement = importedGp || (salesAchievement - (storeBill + baseExpense + creditExpense + cashExpense + miscExpense + cashCommission + staffSalary + managerSalary));
@@ -7774,7 +7774,7 @@ function showPage(page) {
         'MISC Expenses': 1500,
         'Commission': 9500,
         'Staff Salary': 5000,
-        'Manager Salary': 4000,
+        'Rake Manager Salary': 4000,
         'E-Catering': 1000,
         'Gross Profit Achievement': 50000
       }];
@@ -7968,7 +7968,7 @@ function showPage(page) {
         'MISC Expenses': s.miscExpense || 0,
         Commission: s.cashCommission || 0,
         'Staff Salary': s.staffSalary || 0,
-        'Manager Salary': s.managerSalary || 0,
+        'Rake Manager Salary': s.managerSalary || 0,
         'E-Catering': s.eCatering || 0,
         'GP Target': s.gpTarget || 0,
         'GP Achievement': s.gpAchievement || 0,
