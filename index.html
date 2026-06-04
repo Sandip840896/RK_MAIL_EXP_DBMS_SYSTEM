@@ -1444,9 +1444,32 @@
             <div id="complaintEntryTab">
               <div class="form-row">
                 <div class="form-field">
+                  <label>Train Name *</label>
+                  <div class="searchable-select">
+                    <input type="text" id="complaintTrainSearch" placeholder="Search train first..." oninput="filterComplaintTrains(this.value)" onfocus="showComplaintTrainDropdown()">
+                    <input type="hidden" id="complaintTrainName">
+                    <div class="searchable-dropdown" id="complaintTrainDropdown"></div>
+                  </div>
+                </div>
+                <div class="form-field">
+                  <label>Train Number</label>
+                  <input type="text" id="complaintTrainNo">
+                </div>
+                <div class="form-field">
                   <label>Complaint Date *</label>
                   <input type="date" id="complaintDate" value="" onchange="populateComplaintRakeManagers(document.getElementById('complaintTrainNo').value, document.getElementById('complaintTrainName').value, document.getElementById('complaintRakeManager').value); onComplaintRakeManagerChange();">
                 </div>
+                <div class="form-field">
+                  <label>Status</label>
+                  <select id="complaintStatus">
+                    <option>Open</option>
+                    <option>In Progress</option>
+                    <option>Closed</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
                 <div class="form-field">
                   <label>Complaint ID</label>
                   <input type="text" id="complaintId" placeholder="Auto-generated if empty">
@@ -1462,29 +1485,6 @@
                     <option>Direct</option>
                     <option>Other</option>
                   </select>
-                </div>
-                <div class="form-field">
-                  <label>Status</label>
-                  <select id="complaintStatus">
-                    <option>Open</option>
-                    <option>In Progress</option>
-                    <option>Closed</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-field">
-                  <label>Train Number</label>
-                  <input type="text" id="complaintTrainNo">
-                </div>
-                <div class="form-field">
-                  <label>Train Name *</label>
-                  <div class="searchable-select">
-                    <input type="text" id="complaintTrainSearch" placeholder="Search train..." oninput="filterComplaintTrains(this.value)" onfocus="showComplaintTrainDropdown()">
-                    <input type="hidden" id="complaintTrainName">
-                    <div class="searchable-dropdown" id="complaintTrainDropdown"></div>
-                  </div>
                 </div>
                 <div class="form-field">
                   <label>Train Type</label>
@@ -2149,15 +2149,18 @@
             <div class="form-row">
               <div class="form-field">
                 <label>Cluster Manager</label>
-                <select id="masterClusterManager" onchange="onMasterClusterChange()"></select>
+                <input type="text" id="masterClusterManager" list="masterClusterManagerList" placeholder="Type or choose cluster manager" oninput="onMasterClusterChange()" onchange="onMasterClusterChange()">
+                <datalist id="masterClusterManagerList"></datalist>
               </div>
               <div class="form-field">
                 <label>Train Manager</label>
-                <select id="masterTrainManager" onchange="onMasterTrainManagerChange()"></select>
+                <input type="text" id="masterTrainManager" list="masterTrainManagerList" placeholder="Type or choose train manager" oninput="onMasterTrainManagerChange()" onchange="onMasterTrainManagerChange()">
+                <datalist id="masterTrainManagerList"></datalist>
               </div>
               <div class="form-field">
                 <label>Rake Manager</label>
-                <select id="masterRakeManager"></select>
+                <input type="text" id="masterRakeManager" list="masterRakeManagerList" placeholder="Type or choose rake manager">
+                <datalist id="masterRakeManagerList"></datalist>
               </div>
               <div class="form-field">
                 <label>Business Head</label>
@@ -6599,11 +6602,11 @@ function showPage(page) {
     function loadMastersPage() {
       populateYardSelects();
       const clusters = appData.clusterManagers || [];
-      document.getElementById('masterClusterManager').innerHTML = '<option value="">Select Cluster Manager</option>' + clusters.map(m => `<option value="${m}">${m}</option>`).join('');
+      document.getElementById('masterClusterManagerList').innerHTML = clusters.map(m => `<option value="${m}"></option>`).join('');
       const allTrainManagers = [...new Set([...(appData.trainManagers || []), ...Object.keys(appData.trainManagerHierarchy || {})])].sort();
-      document.getElementById('masterTrainManager').innerHTML = '<option value="">Select Train Manager</option>' + allTrainManagers.map(m => `<option value="${m}">${m}</option>`).join('');
+      document.getElementById('masterTrainManagerList').innerHTML = allTrainManagers.map(m => `<option value="${m}"></option>`).join('');
       const allRakeManagers = [...new Set([...(appData.rakeManagers || []), ...Object.keys(appData.rakeManagerHierarchy || {})])].sort();
-      document.getElementById('masterRakeManager').innerHTML = '<option value="">Select Rake Manager</option>' + allRakeManagers.map(m => `<option value="${m}">${m}</option>`).join('');
+      document.getElementById('masterRakeManagerList').innerHTML = allRakeManagers.map(m => `<option value="${m}"></option>`).join('');
       onMasterClusterChange();
       onMasterTrainManagerChange();
       
@@ -6633,31 +6636,27 @@ function showPage(page) {
 
     function onMasterClusterChange() {
       const cluster = document.getElementById('masterClusterManager')?.value || '';
-      const trainManagerSelect = document.getElementById('masterTrainManager');
-      if (!trainManagerSelect) return;
+      const trainManagerList = document.getElementById('masterTrainManagerList');
+      if (!trainManagerList) return;
       const allTrainManagers = [...new Set([...(appData.trainManagers || []), ...Object.keys(appData.trainManagerHierarchy || {})])].sort();
       const filtered = allTrainManagers.filter(tm => {
         const linkedCluster = appData.trainManagerHierarchy?.[tm];
         return !cluster || !linkedCluster || linkedCluster === cluster;
       });
-      const current = trainManagerSelect.value;
-      trainManagerSelect.innerHTML = '<option value="">Select Train Manager</option>' + filtered.map(tm => `<option value="${tm}">${tm}</option>`).join('');
-      if (filtered.includes(current)) trainManagerSelect.value = current;
+      trainManagerList.innerHTML = filtered.map(tm => `<option value="${tm}"></option>`).join('');
       onMasterTrainManagerChange();
     }
 
     function onMasterTrainManagerChange() {
       const trainManager = document.getElementById('masterTrainManager')?.value || '';
-      const rakeSelect = document.getElementById('masterRakeManager');
-      if (!rakeSelect) return;
+      const rakeList = document.getElementById('masterRakeManagerList');
+      if (!rakeList) return;
       const allRakes = [...new Set([...(appData.rakeManagers || []), ...Object.keys(appData.rakeManagerHierarchy || {})])].sort();
       const filtered = allRakes.filter(rm => {
         const linkedTrainManager = appData.rakeManagerHierarchy?.[rm];
         return !trainManager || !linkedTrainManager || linkedTrainManager === trainManager;
       });
-      const current = rakeSelect.value;
-      rakeSelect.innerHTML = '<option value="">Select Rake Manager</option>' + filtered.map(rm => `<option value="${rm}">${rm}</option>`).join('');
-      if (filtered.includes(current)) rakeSelect.value = current;
+      rakeList.innerHTML = filtered.map(rm => `<option value="${rm}"></option>`).join('');
     }
 
     function saveTrainMaster() {
@@ -6666,9 +6665,9 @@ function showPage(page) {
       const number = normalizeTrainNo(document.getElementById('masterTrainNumber').value.trim());
       const rakeNumber = document.getElementById('masterRakeNumber').value.trim();
       const yard = document.getElementById('masterYard').value;
-      const clusterManager = document.getElementById('masterClusterManager').value;
-      const trainManager = document.getElementById('masterTrainManager').value;
-      const rakeManager = document.getElementById('masterRakeManager').value;
+      const clusterManager = document.getElementById('masterClusterManager').value.trim();
+      const trainManager = document.getElementById('masterTrainManager').value.trim();
+      const rakeManager = document.getElementById('masterRakeManager').value.trim();
       const businessHead = document.getElementById('masterBusinessHead').value.trim();
       const vp = document.getElementById('masterVp').value.trim();
       const validFrom = document.getElementById('masterValidFrom').value;
@@ -6711,6 +6710,8 @@ function showPage(page) {
         validTo: validTo || ''
       };
 
+      if (clusterManager && !appData.clusterManagers.includes(clusterManager)) appData.clusterManagers.push(clusterManager);
+      if (trainManager && !appData.trainManagers.includes(trainManager)) appData.trainManagers.push(trainManager);
       if (trainManager && clusterManager) appData.trainManagerHierarchy[trainManager] = clusterManager;
       if (rakeManager && trainManager) appData.rakeManagerHierarchy[rakeManager] = trainManager;
       if (rakeManager && !appData.rakeManagers.includes(rakeManager)) appData.rakeManagers.push(rakeManager);
