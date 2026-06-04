@@ -1293,7 +1293,9 @@
                 </div>
                 <div class="form-field">
                   <label>Rake Manager</label>
-                  <input type="text" id="salesRakeManager" readonly>
+                  <select id="salesRakeManager" onchange="onSalesRakeManagerChange()">
+                    <option value="">Select train first</option>
+                  </select>
                 </div>
                 <div class="form-field">
                   <label>Train Type</label>
@@ -1484,7 +1486,7 @@
                 </div>
                 <div class="form-field">
                   <label>Complaint Date *</label>
-                  <input type="date" id="complaintDate" value="" onchange="populateComplaintRakeManagers(document.getElementById('complaintTrainNo').value, document.getElementById('complaintTrainName').value, document.getElementById('complaintRakeManager').value); onComplaintRakeManagerChange();">
+                  <input type="date" id="complaintDate" value="" onchange="populateComplaintRakeManagers(document.getElementById('complaintTrainNo').value, document.getElementById('complaintTrainName').value, document.getElementById('complaintRakeManager').value, '', document.getElementById('complaintRakeNumber').value); onComplaintRakeManagerChange();">
                 </div>
                 <div class="form-field">
                   <label>Status</label>
@@ -4307,6 +4309,7 @@ function showPage(page) {
       const rakeMatched = pool.filter(t => {
         const managerMatch = rakeKey && normalizeText(t.rakeManager) === rakeKey;
         const numberMatch = rakeNoKey && normalizeText(t.rakeNumber) === rakeNoKey;
+        if (rakeKey && rakeNoKey) return managerMatch && numberMatch;
         return managerMatch || numberMatch;
       });
       if (rakeMatched.length) pool = rakeMatched;
@@ -4360,6 +4363,24 @@ function showPage(page) {
         .sort((a, b) => String(a.rakeManager || '').localeCompare(String(b.rakeManager || '')));
     }
 
+    function getRakeOptionsForTrainRack(trainNumber, trainName, rakeNumber, dateValue) {
+      const rakeKey = normalizeText(rakeNumber);
+      let options = getRakeOptionsForTrain(trainNumber, trainName, dateValue);
+      if (rakeKey) options = options.filter(t => normalizeText(t.rakeNumber) === rakeKey);
+      if (!options.length && rakeKey) {
+        options = getPreferredTrainMasterMatches(trainNumber, trainName)
+          .filter(t => normalizeText(t.rakeNumber) === rakeKey)
+          .filter(t => t.rakeManager || t.rakeNumber);
+      }
+      const seen = new Set();
+      return options.filter(t => {
+        const key = `${normalizeText(t.rakeNumber)}|${normalizeText(t.rakeManager)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).sort((a, b) => String(a.rakeManager || '').localeCompare(String(b.rakeManager || '')));
+    }
+
     function getRakeManagerFromComplaint(c) {
       if (c.rakeManager) return c.rakeManager;
       const effective = getEffectiveMaster(c.trainNo, c.trainName, c.date, c.rakeManager, c.rakeNumber);
@@ -4377,7 +4398,7 @@ function showPage(page) {
       document.getElementById('salesGpTarget').value = getTrainGpTarget(selected.trainNumber, selected.trainName, saleDate);
       document.getElementById('salesClusterManager').value = effective.clusterManager || '';
       document.getElementById('salesTrainManager').value = effective.trainManager || '';
-      document.getElementById('salesRakeManager').value = effective.rakeManager || '';
+      populateSalesRakeManagers(effective, effective.rakeManager || selected.rakeManager || '');
       checkExistingSalesForSelectedTrain();
       calculateSalesPct();
       calculateGpPct();
@@ -5653,12 +5674,55 @@ function showPage(page) {
         document.getElementById('salesYard').value = effective.yard || train.yard || '';
         document.getElementById('salesClusterManager').value = effective.clusterManager || train.clusterManager || '';
         document.getElementById('salesTrainManager').value = effective.trainManager || train.trainManager || '';
-        document.getElementById('salesRakeManager').value = effective.rakeManager || train.rakeManager || '';
+        populateSalesRakeManagers(effective, effective.rakeManager || train.rakeManager || '');
         document.getElementById('salesTrainType').value = effective.trainType || train.trainType || '';
         document.getElementById('salesTarget').value = getTrainSalesTarget(effectiveNumber, effectiveName, saleDate);
         document.getElementById('salesGpTarget').value = getTrainGpTarget(effectiveNumber, effectiveName, saleDate);
         refreshSalesTargetForDate();
       }
+    }
+
+    function populateSalesRakeManagers(master, selectedRakeManager = '') {
+      const select = document.getElementById('salesRakeManager');
+      if (!select) return;
+      if (!master) {
+        select.innerHTML = '<option value="">Select train first</option>';
+        return;
+      }
+      const date = document.getElementById('salesDate')?.value || '';
+      let options = getRakeOptionsForTrainRack(master.trainNumber, master.trainName, master.rakeNumber, date);
+      if (hasRakeInfo(master) && !options.some(t => String(t.id) === String(master.id))) options = [master, ...options];
+      if (!options.length) {
+        select.innerHTML = '<option value="">No rake manager found</option>';
+        return;
+      }
+      select.innerHTML = options.map(t => {
+        const label = `${t.rakeManager || 'Unassigned'}${t.rakeNumber ? ' - ' + t.rakeNumber : ''}`;
+        return `<option value="${t.rakeManager || ''}" data-master-id="${t.id || ''}" data-rake-number="${t.rakeNumber || ''}">${label}</option>`;
+      }).join('');
+      if (selectedRakeManager) select.value = selectedRakeManager;
+      if (!select.value && options.length) select.value = options[0].rakeManager || '';
+      onSalesRakeManagerChange();
+    }
+
+    function onSalesRakeManagerChange() {
+      const select = document.getElementById('salesRakeManager');
+      if (!select) return;
+      const selectedOption = select.selectedOptions?.[0];
+      const masterId = selectedOption?.dataset?.masterId || '';
+      const trainNo = document.getElementById('salesTrainNo')?.value || '';
+      const trainName = document.getElementById('salesTrainSearch')?.value || '';
+      const date = document.getElementById('salesDate')?.value || '';
+      const rakeManager = select.value || '';
+      const rakeNumber = selectedOption?.dataset?.rakeNumber || '';
+      const master = (masterId ? (appData.trainMasters || []).find(t => String(t.id) === String(masterId)) : null)
+        || getEffectiveMaster(trainNo, trainName, date, rakeManager, rakeNumber);
+      if (!master) return;
+      document.getElementById('salesTrainId').value = master.id || document.getElementById('salesTrainId').value;
+      document.getElementById('salesYard').value = master.yard || '';
+      document.getElementById('salesClusterManager').value = master.clusterManager || '';
+      document.getElementById('salesTrainManager').value = master.trainManager || '';
+      document.getElementById('salesTrainType').value = master.trainType || '';
     }
 
     function calculateSalesPct() {
@@ -5688,7 +5752,7 @@ function showPage(page) {
     }
 
     function setSalesEntryFieldsDisabled(disabled) {
-      ['salesAchievement','salesStoreBill','salesBaseExpense','salesCreditExpense','salesCashExpense','salesMiscExpense','salesStaffSalary','salesManagerSalary','salesECatering','salesRemarks'].forEach(id => {
+      ['salesRakeManager','salesAchievement','salesStoreBill','salesBaseExpense','salesCreditExpense','salesCashExpense','salesMiscExpense','salesStaffSalary','salesManagerSalary','salesECatering','salesRemarks'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.disabled = disabled;
       });
@@ -5704,7 +5768,14 @@ function showPage(page) {
       document.getElementById('salesYard').value = entry.yard || '';
       document.getElementById('salesClusterManager').value = entry.clusterManager || '';
       document.getElementById('salesTrainManager').value = entry.trainManager || '';
-      document.getElementById('salesRakeManager').value = entry.rakeManager || '';
+      const selectedMaster = getEffectiveMaster(entry.trainNumber, entry.trainName, entry.date, entry.rakeManager, entry.rakeNumber);
+      populateSalesRakeManagers(selectedMaster || {
+        trainNumber: entry.trainNumber,
+        trainName: entry.trainName,
+        rakeNumber: entry.rakeNumber,
+        rakeManager: entry.rakeManager,
+        id: entry.trainId
+      }, entry.rakeManager || '');
       document.getElementById('salesTrainType').value = entry.trainType || '';
       document.getElementById('salesTarget').value = entry.salesTarget || '';
       document.getElementById('salesAchievement').value = entry.salesAchievement || entry.totalSale || '';
@@ -5887,7 +5958,13 @@ function showPage(page) {
 
       const train = appData.trainMasters.find(t => t.id == trainId);
       if (!train) { showAlert('Train not found', 'error'); return; }
-      const effectiveTrain = resolveSelectedTrainMaster(trainId, train.trainNumber, train.trainName, date) || train;
+      const selectedRakeManager = document.getElementById('salesRakeManager')?.value || '';
+      const selectedRakeNumber = document.getElementById('salesRakeManager')?.selectedOptions?.[0]?.dataset?.rakeNumber || train.rakeNumber || '';
+      const selectedMasterId = document.getElementById('salesRakeManager')?.selectedOptions?.[0]?.dataset?.masterId || '';
+      const effectiveTrain = (selectedMasterId ? (appData.trainMasters || []).find(t => String(t.id) === String(selectedMasterId)) : null)
+        || getEffectiveMaster(train.trainNumber, train.trainName, date, selectedRakeManager, selectedRakeNumber)
+        || resolveSelectedTrainMaster(trainId, train.trainNumber, train.trainName, date)
+        || train;
       const duplicate = findDuplicateEntry(appData.sales, date, train.trainNumber, train.trainName, editingId);
       if (duplicate && !confirm('Sales data is already available for same train number and date. Overwrite existing entry?')) return;
       const existingForEdit = editingId ? (appData.sales || []).find(s => s.id == editingId) : null;
@@ -5901,9 +5978,9 @@ function showPage(page) {
         id: editingId || Date.now(),
         date: date,
         month: new Date(date).toLocaleString('en-US', { month: 'short' }),
-        trainId: trainId,
-        trainName: train.trainName,
-        trainNumber: normalizeTrainNo(train.trainNumber) || train.trainNumber || '',
+        trainId: effectiveTrain.id || trainId,
+        trainName: effectiveTrain.trainName || train.trainName,
+        trainNumber: normalizeTrainNo(effectiveTrain.trainNumber || train.trainNumber) || effectiveTrain.trainNumber || train.trainNumber || '',
         yard: effectiveTrain.yard || train.yard,
         clusterManager: effectiveTrain.clusterManager || '',
         trainManager: effectiveTrain.trainManager || '',
@@ -5962,7 +6039,7 @@ function showPage(page) {
       document.getElementById('salesYard').value = '';
       document.getElementById('salesClusterManager').value = '';
       document.getElementById('salesTrainManager').value = '';
-      document.getElementById('salesRakeManager').value = '';
+      document.getElementById('salesRakeManager').innerHTML = '<option value="">Select train first</option>';
       document.getElementById('salesTrainType').value = '';
       document.getElementById('salesTarget').value = '';
       document.getElementById('salesAchievement').value = '';
@@ -6106,21 +6183,22 @@ function showPage(page) {
       document.getElementById('complaintTrainNo').value = normalizeTrainNo(effectiveNumber) || effectiveNumber;
       document.getElementById('complaintTrainType').value = effective?.trainType || type || '';
       if (effective?.yard || yard) document.getElementById('complaintYard').value = effective?.yard || yard;
-      populateComplaintRakeManagers(effectiveNumber, effectiveName, effectiveRakeManager, id);
+      populateComplaintRakeManagers(effectiveNumber, effectiveName, effectiveRakeManager, id, effective?.rakeNumber || '');
       onComplaintRakeManagerChange();
     }
 
-    function populateComplaintRakeManagers(trainNumber, trainName, selectedRakeManager = '', selectedTrainId = '') {
+    function populateComplaintRakeManagers(trainNumber, trainName, selectedRakeManager = '', selectedTrainId = '', selectedRakeNumber = '') {
       const select = document.getElementById('complaintRakeManager');
       if (!select) return;
       const date = document.getElementById('complaintDate')?.value || '';
       const selectedMaster = resolveSelectedTrainMaster(selectedTrainId, trainNumber, trainName, date);
-      let options = getRakeOptionsForTrain(trainNumber, trainName, date);
+      const rakeScope = selectedMaster?.rakeNumber || selectedRakeNumber || '';
+      let options = rakeScope ? getRakeOptionsForTrainRack(trainNumber, trainName, rakeScope, date) : getRakeOptionsForTrain(trainNumber, trainName, date);
       if (hasRakeInfo(selectedMaster) && !options.some(t => String(t.id) === String(selectedMaster.id))) {
         options = [selectedMaster, ...options];
       }
       if (!options.length && selectedMaster && (selectedMaster.rakeManager || selectedMaster.rakeNumber)) options = [selectedMaster];
-      if (!options.length) options = getPreferredTrainMasterMatches(trainNumber, trainName).filter(hasRakeInfo);
+      if (!options.length) options = getPreferredTrainMasterMatches(trainNumber, trainName).filter(t => hasRakeInfo(t) && (!rakeScope || normalizeText(t.rakeNumber) === normalizeText(rakeScope)));
       if (!options.length) {
         select.innerHTML = '<option value="">No rake manager found in master</option>';
         document.getElementById('complaintRakeNumber').value = '';
@@ -6133,7 +6211,7 @@ function showPage(page) {
       }
       select.innerHTML = '<option value="">Select Rake Manager</option>' + options.map(t => {
         const label = `${t.rakeManager || 'Unassigned'}${t.rakeNumber ? ' - ' + t.rakeNumber : ''}`;
-        return `<option value="${t.rakeManager || ''}" data-rake-number="${t.rakeNumber || ''}">${label}</option>`;
+        return `<option value="${t.rakeManager || ''}" data-master-id="${t.id || ''}" data-rake-number="${t.rakeNumber || ''}">${label}</option>`;
       }).join('');
       if (selectedRakeManager) select.value = selectedRakeManager;
       if (!select.value && selectedMaster?.rakeManager) select.value = selectedMaster.rakeManager || '';
@@ -6145,7 +6223,9 @@ function showPage(page) {
       const trainName = document.getElementById('complaintTrainName')?.value || '';
       const rakeManager = document.getElementById('complaintRakeManager')?.value || '';
       const rakeNumber = document.getElementById('complaintRakeManager')?.selectedOptions?.[0]?.dataset?.rakeNumber || '';
-      const effective = getEffectiveMaster(trainNo, trainName, document.getElementById('complaintDate')?.value, rakeManager, rakeNumber);
+      const masterId = document.getElementById('complaintRakeManager')?.selectedOptions?.[0]?.dataset?.masterId || '';
+      const effective = (masterId ? (appData.trainMasters || []).find(t => String(t.id) === String(masterId)) : null)
+        || getEffectiveMaster(trainNo, trainName, document.getElementById('complaintDate')?.value, rakeManager, rakeNumber);
       document.getElementById('complaintRakeNumber').value = effective?.rakeNumber || rakeNumber || '';
       document.getElementById('complaintRakeManagerPhone').value = effective?.rakeManagerContact || effective?.rakeManagerPhone || '';
       document.getElementById('complaintTrainManager').value = effective?.trainManager || '';
@@ -6426,7 +6506,7 @@ function showPage(page) {
       document.getElementById('complaintTrainSearch').value = c.trainName;
       document.getElementById('complaintTrainType').value = c.trainType || '';
       document.getElementById('complaintYard').value = c.yard;
-      populateComplaintRakeManagers(c.trainNo, c.trainName, c.rakeManager || '');
+      populateComplaintRakeManagers(c.trainNo, c.trainName, c.rakeManager || '', '', c.rakeNumber || '');
       document.getElementById('complaintRakeManager').value = c.rakeManager || '';
       document.getElementById('complaintRakeNumber').value = c.rakeNumber || '';
       document.getElementById('complaintRakeManagerPhone').value = c.rakeManagerContact || c.rakeManagerPhone || '';
@@ -6824,11 +6904,12 @@ function showPage(page) {
         const dupe = appData.trainMasters.find(t =>
           (normalizeTrainNo(t.trainNumber) === number) &&
           (normalizeText(t.rakeNumber) === normalizeText(rakeNumber)) &&
+          (normalizeText(t.rakeManager) === normalizeText(rakeManager)) &&
           (t.validFrom || '') === validFrom &&
           (t.validTo || '') === (validTo || '')
         );
         if (dupe) {
-          showAlert('A manager master already exists for this train, rake number and validity period. Please edit that entry.', 'error');
+          showAlert('A manager master already exists for this train, rake number, rake manager and validity period. Please edit that entry.', 'error');
           return;
         }
         appData.trainMasters.push(train);
@@ -7610,11 +7691,12 @@ function showPage(page) {
             const existing = (appData.trainMasters || []).find(t =>
               normalizeTrainNo(t.trainNumber) === train.trainNumber &&
               normalizeText(t.rakeNumber) === normalizeText(train.rakeNumber) &&
+              normalizeText(t.rakeManager) === normalizeText(train.rakeManager) &&
               (t.validFrom || '') === (train.validFrom || '') &&
               (t.validTo || '') === (train.validTo || '')
             );
             if (existing) {
-              if (overwriteAll === null) overwriteAll = confirm('Train Manager Master already has data for same train, rake and validity period. Overwrite matching entries from this upload?');
+              if (overwriteAll === null) overwriteAll = confirm('Train Manager Master already has data for same train, rake, rake manager and validity period. Overwrite matching entries from this upload?');
               if (overwriteAll) {
                 const index = appData.trainMasters.findIndex(t => t.id == existing.id);
                 if (index >= 0) appData.trainMasters[index] = { ...train, id: existing.id };
@@ -8388,6 +8470,7 @@ function showPage(page) {
     window.filterTrains = filterTrains;
     window.showTrainDropdown = showTrainDropdown;
     window.selectTrain = selectTrain;
+    window.onSalesRakeManagerChange = onSalesRakeManagerChange;
     window.calculateSalesPct = calculateSalesPct;
     window.calculateSalesCostsAndGp = calculateSalesCostsAndGp;
     window.calculateGpPct = calculateGpPct;
