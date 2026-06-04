@@ -7607,7 +7607,7 @@ function showPage(page) {
           if (train.trainName && train.trainNumber && train.rakeNumber) {
             ensureYardExists(train.yard);
             if (train.trainManager && train.clusterManager) appData.trainManagerHierarchy[train.trainManager] = train.clusterManager;
-            if (train.rakeManager && train.trainManager) appData.rakeManagerHierarchy[train.rakeManager] = train.trainManager;
+            if (train.rakeManager && train.trainManager && !appData.rakeManagerHierarchy[train.rakeManager]) appData.rakeManagerHierarchy[train.rakeManager] = train.trainManager;
             if (train.rakeManager && !appData.rakeManagers.includes(train.rakeManager)) appData.rakeManagers.push(train.rakeManager);
 
             const existing = (appData.trainMasters || []).find(t =>
