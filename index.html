@@ -4160,9 +4160,15 @@ function showPage(page) {
       return (appData.trainMasters || []).filter(t => {
         const tNo5 = normalizeTrainNo(t.trainNumber);
         const numberMatch = no5 && tNo5 && no5 === tNo5;
-        const nameMatch = !no5 && nameKey && normalizeText(t.trainName) === nameKey;
+        const nameMatch = nameKey && normalizeText(t.trainName) === nameKey;
         return numberMatch || nameMatch;
       });
+    }
+
+    function resolveSelectedTrainMaster(trainId, trainNumber, trainName, dateValue) {
+      const selected = trainId ? (appData.trainMasters || []).find(t => t.id == trainId) : null;
+      if (selected && (selected.rakeManager || selected.rakeNumber || selected.trainManager)) return selected;
+      return getEffectiveMaster(trainNumber || selected?.trainNumber, trainName || selected?.trainName, dateValue, selected?.rakeManager, selected?.rakeNumber) || selected;
     }
 
     function getEffectiveMaster(trainNumber, trainName, dateValue, rakeManager = '', rakeNumber = '') {
@@ -5761,7 +5767,7 @@ function showPage(page) {
 
       const train = appData.trainMasters.find(t => t.id == trainId);
       if (!train) { showAlert('Train not found', 'error'); return; }
-      const effectiveTrain = getEffectiveMaster(train.trainNumber, train.trainName, date, train.rakeManager, train.rakeNumber) || train;
+      const effectiveTrain = resolveSelectedTrainMaster(trainId, train.trainNumber, train.trainName, date) || train;
       const duplicate = findDuplicateEntry(appData.sales, date, train.trainNumber, train.trainName, editingId);
       if (duplicate && !confirm('Sales data is already available for same train number and date. Overwrite existing entry?')) return;
       const existingForEdit = editingId ? (appData.sales || []).find(s => s.id == editingId) : null;
@@ -5971,7 +5977,7 @@ function showPage(page) {
       const select = document.getElementById('complaintRakeManager');
       if (!select) return;
       const date = document.getElementById('complaintDate')?.value || '';
-      const selectedMaster = selectedTrainId ? (appData.trainMasters || []).find(t => t.id == selectedTrainId) : null;
+      const selectedMaster = resolveSelectedTrainMaster(selectedTrainId, trainNumber, trainName, date);
       let options = getRakeOptionsForTrain(trainNumber, trainName, date);
       if (!options.length && selectedMaster && (selectedMaster.rakeManager || selectedMaster.rakeNumber)) options = [selectedMaster];
       if (!options.length && trainName) options = (appData.trainMasters || []).filter(t => normalizeText(t.trainName) === normalizeText(trainName) && (t.rakeManager || t.rakeNumber));
@@ -6352,7 +6358,7 @@ function showPage(page) {
       document.getElementById('cashTrainDropdown').classList.remove('active');
       const date = document.getElementById('cashDate').value;
       const selected = (appData.trainMasters || []).find(t => t.id == id);
-      const effective = getEffectiveMaster(number, name, date, selected?.rakeManager, selected?.rakeNumber) || selected;
+      const effective = resolveSelectedTrainMaster(id, number, name, date) || selected;
       document.getElementById('cashTrainManager').value = effective?.trainManager || '';
       document.getElementById('cashRakeManager').value = effective?.rakeManager || '';
       updateCashGPFromSales();
@@ -6386,7 +6392,7 @@ function showPage(page) {
         return;
       }
 
-      const effective = train ? (getEffectiveMaster(train.trainNumber, train.trainName, date, train.rakeManager, train.rakeNumber) || train) : null;
+      const effective = train ? (resolveSelectedTrainMaster(trainId, train.trainNumber, train.trainName, date) || train) : null;
       const duplicate = train ? findDuplicateEntry(appData.cash, date, train.trainNumber, train.trainName, editingId) : null;
       if (duplicate && !confirm('Cash deposit data is already available for same train number and date. Overwrite existing entry?')) return;
 
