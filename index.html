@@ -4415,6 +4415,12 @@ function showPage(page) {
       return effective?.rakeManager || 'Unassigned';
     }
 
+    function getRakeManagerPhoneFromEntry(entry) {
+      if (entry?.rakeManagerContact || entry?.rakeManagerPhone) return entry.rakeManagerContact || entry.rakeManagerPhone;
+      const effective = getEffectiveMaster(entry?.trainNumber || entry?.trainNo, entry?.trainName, entry?.date, entry?.rakeManager, entry?.rakeNumber);
+      return effective?.rakeManagerContact || effective?.rakeManagerPhone || '';
+    }
+
     function refreshSalesTargetForDate() {
       const trainId = document.getElementById('salesTrainId')?.value;
       const saleDate = document.getElementById('salesDate')?.value;
@@ -6013,6 +6019,8 @@ function showPage(page) {
         clusterManager: effectiveTrain.clusterManager || '',
         trainManager: effectiveTrain.trainManager || '',
         rakeManager: effectiveTrain.rakeManager || '',
+        rakeManagerContact: effectiveTrain.rakeManagerContact || effectiveTrain.rakeManagerPhone || '',
+        rakeManagerPhone: effectiveTrain.rakeManagerContact || effectiveTrain.rakeManagerPhone || '',
         rakeNumber: effectiveTrain.rakeNumber || '',
         businessHead: effectiveTrain.businessHead || '',
         vp: effectiveTrain.vp || '',
@@ -6666,6 +6674,8 @@ function showPage(page) {
         trainNumber: train ? (normalizeTrainNo(train.trainNumber) || train.trainNumber || '') : '',
         trainManager: effective?.trainManager || '',
         rakeManager: effective?.rakeManager || '',
+        rakeManagerContact: effective?.rakeManagerContact || effective?.rakeManagerPhone || '',
+        rakeManagerPhone: effective?.rakeManagerContact || effective?.rakeManagerPhone || '',
         rakeNumber: effective?.rakeNumber || '',
         businessHead: effective?.businessHead || '',
         vp: effective?.vp || '',
@@ -7627,6 +7637,8 @@ function showPage(page) {
             trainNumber: master ? (normalizeTrainNo(master.trainNumber) || master.trainNumber || '') : trainNumber,
             trainManager: master?.trainManager || '',
             rakeManager: master?.rakeManager || '',
+            rakeManagerContact: master?.rakeManagerContact || master?.rakeManagerPhone || '',
+            rakeManagerPhone: master?.rakeManagerContact || master?.rakeManagerPhone || '',
             rakeNumber: master?.rakeNumber || '',
             businessHead: master?.businessHead || '',
             vp: master?.vp || '',
@@ -8066,6 +8078,7 @@ function showPage(page) {
         'Train Number': s.trainNumber || s.trainNo || '',
         'Train Manager': s.trainManager || '',
         'Rake Manager': s.rakeManager || '',
+        'Rake Manager Phone': getRakeManagerPhoneFromEntry(s),
         'Sales Target': s.salesTarget || 0,
         'Total Sale': s.salesAchievement || s.totalSale || 0,
         'Store Bill': s.storeBill || 0,
@@ -8129,6 +8142,7 @@ function showPage(page) {
         'Train Manager': c.trainManager || '',
         'Train Manager Phone': c.trainManagerContact || c.trainManagerPhone || '',
         'Rake Manager': c.rakeManager || '',
+        'Rake Manager Phone': getRakeManagerPhoneFromEntry(c),
         'Amount To Be Collected': c.amountToCollect || c.gpFromSales || c.gpCollected || 0,
         'Cash Deposit': c.cashDepositCounter || 0,
         'Online Deposit': c.onlineDeposit || 0,
