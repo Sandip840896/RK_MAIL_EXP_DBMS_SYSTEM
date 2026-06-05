@@ -160,6 +160,12 @@
     .form-field input:focus, .form-field select:focus, .form-field textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); }
     .form-field input:read-only { background: #f1f5f9; color: #64748b; }
     .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .rake-summary-scroll { overflow-x: auto; }
+    #trainManagerSalesSummaryTable { min-width: 900px; }
+    #trainManagerSalesSummaryTable thead,
+    #trainManagerSalesSummaryTable tbody tr { display: table; width: 100%; table-layout: fixed; }
+    #trainManagerSalesSummaryTable tbody { display: block; max-height: 455px; overflow-y: scroll; scrollbar-gutter: stable; }
+    #trainManagerSalesSummaryTable .summary-total-row { position: sticky; top: 0; z-index: 1; font-weight: 700; background: #f8fafc; }
     .compact-table-container { max-height: 430px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
     .compact-table-container table { min-width: 1250px; }
     .compact-table-container thead th { position: sticky; top: 0; z-index: 2; }
@@ -855,10 +861,10 @@
                 <i class="fas fa-file-excel"></i>
               </button>
             </div>
-            <div class="table-container" style="max-height: 520px; overflow-y: auto;">
+            <div class="table-container rake-summary-scroll">
               <table id="trainManagerSalesSummaryTable">
                 <thead>
-                  <tr style="position: sticky; top: 0; z-index: 2;">
+                  <tr>
                     <th>Rake Manager</th>
                     <th>Trains</th>
                     <th>Entries</th>
@@ -4182,7 +4188,7 @@ function showPage(page) {
         managerSalary: total.managerSalary + r.managerSalary
       }), { trainCount: 0, entries: 0, totalSale: 0, totalGp: 0, managerSalary: 0 });
       tbody.innerHTML = `
-        <tr style="font-weight:700; background:#f8fafc; position: sticky; top: 52px; z-index: 1;">
+        <tr class="summary-total-row">
           <td>Total</td>
           <td>${totalRow.trainCount}</td>
           <td>${totalRow.entries}</td>
