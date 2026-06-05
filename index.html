@@ -1972,7 +1972,7 @@
               <div class="form-row">
                 <div class="form-field">
                   <label>Date *</label>
-                  <input type="date" id="cashDate" value="" onchange="updateCashGPFromSales()">
+                  <input type="date" id="cashDate" value="" onchange="rememberLastCashDate(); updateCashGPFromSales()">
                 </div>
                 <div class="form-field">
                   <label>Yard *</label>
@@ -3113,7 +3113,7 @@ console.log("✅ Connected to NEW Firebase");
       const today = new Date().toISOString().split('T')[0];
       document.getElementById('salesDate') && (document.getElementById('salesDate').value = today);
       document.getElementById('complaintDate') && (document.getElementById('complaintDate').value = today);
-      document.getElementById('cashDate') && (document.getElementById('cashDate').value = today);
+      document.getElementById('cashDate') && (document.getElementById('cashDate').value = getLastCashEntryDate());
       document.getElementById('dashDateMode') && (document.getElementById('dashDateMode').value = 'single');
       document.getElementById('compDateMode') && (document.getElementById('compDateMode').value = 'single');
       const salesLastDate = getLatestDataDate(appData.sales);
@@ -3125,6 +3125,15 @@ console.log("✅ Connected to NEW Firebase");
       document.getElementById('compSingleToDate') && (document.getElementById('compSingleToDate').value = complaintLastDate || today);
       document.getElementById('cashDashFromDate') && (document.getElementById('cashDashFromDate').value = cashLastDate || today);
       document.getElementById('cashDashToDate') && (document.getElementById('cashDashToDate').value = cashLastDate || today);
+    }
+
+    function getLastCashEntryDate() {
+      return localStorage.getItem('rkLastCashEntryDate') || new Date().toISOString().split('T')[0];
+    }
+
+    function rememberLastCashDate() {
+      const date = document.getElementById('cashDate')?.value;
+      if (date) localStorage.setItem('rkLastCashEntryDate', date);
     }
 
     // ==================== MOBILE SIDEBAR ====================
@@ -6704,6 +6713,7 @@ function showPage(page) {
         appData.cash.push(entry);
       }
 
+      rememberLastCashDate();
       saveData();
       clearCashForm();
       showAlert('Cash entry saved successfully', 'success');
@@ -6715,7 +6725,7 @@ function showPage(page) {
     function clearCashForm() {
       editingId = null;
       editingType = null;
-      document.getElementById('cashDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('cashDate').value = getLastCashEntryDate();
       document.getElementById('cashYard').value = appData.yards[0] || '';
       document.getElementById('cashTrainId').value = '';
       document.getElementById('cashTrainSearch').value = '';
@@ -8533,6 +8543,7 @@ function showPage(page) {
     window.showCashTrainDropdown = showCashTrainDropdown;
     window.selectCashTrain = selectCashTrain;
     window.calculateTotalDeposit = calculateTotalDeposit;
+    window.rememberLastCashDate = rememberLastCashDate;
     window.saveCashEntry = saveCashEntry;
     window.clearCashForm = clearCashForm;
     window.editCashEntry = editCashEntry;
