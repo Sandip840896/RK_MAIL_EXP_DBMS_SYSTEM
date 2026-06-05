@@ -5533,8 +5533,15 @@ function showPage(page) {
 
     function isSameTrainForCashSale(cashEntry, saleEntry) {
       if (!cashEntry || !saleEntry) return false;
-      if (cashEntry.trainId && saleEntry.trainId && String(cashEntry.trainId) === String(saleEntry.trainId)) return true;
-      return buildTrainKey(cashEntry.trainNumber, cashEntry.trainName) === buildTrainKey(saleEntry.trainNumber, saleEntry.trainName);
+      const sameTrain = buildTrainKey(cashEntry.trainNumber, cashEntry.trainName) === buildTrainKey(saleEntry.trainNumber, saleEntry.trainName);
+      const sameMasterId = cashEntry.trainId && saleEntry.trainId && String(cashEntry.trainId) === String(saleEntry.trainId);
+      const cashRake = normalizeText(cashEntry.rakeNumber);
+      const saleRake = normalizeText(saleEntry.rakeNumber);
+      const cashManager = normalizeText(cashEntry.rakeManager);
+      const saleManager = normalizeText(saleEntry.rakeManager);
+      const sameRake = cashRake && saleRake ? cashRake === saleRake : true;
+      const sameRakeManager = cashManager && saleManager ? cashManager === saleManager : true;
+      return (sameMasterId || sameTrain) && sameRake && sameRakeManager;
     }
 
     function renderPendingDepositTable(cashData, salesData) {
@@ -5587,12 +5594,22 @@ function showPage(page) {
       `).join('') : '<tr><td colspan="9" style="text-align:center;color:#64748b;">No pending deposits for selected filters.</td></tr>';
     }
 
-    function findSalesEntryForCash(date, trainId, trainNumber, trainName) {
+    function findSalesEntryForCash(date, trainId, trainNumber, trainName, rakeManager = '', rakeNumber = '') {
       const day = getComparableDate(date);
-      return (appData.sales || []).find(s => getComparableDate(s.date) === day && (
-        (trainId && String(s.trainId) === String(trainId)) ||
-        buildTrainKey(s.trainNumber, s.trainName) === buildTrainKey(trainNumber, trainName)
-      ));
+      const selectedRake = normalizeText(rakeNumber);
+      const selectedManager = normalizeText(rakeManager);
+      return (appData.sales || []).find(s => {
+        if (getComparableDate(s.date) !== day) return false;
+        const sameMaster = trainId && s.trainId && String(s.trainId) === String(trainId);
+        const sameTrain = buildTrainKey(s.trainNumber, s.trainName) === buildTrainKey(trainNumber, trainName);
+        if (!sameMaster && !sameTrain) return false;
+        const saleRake = normalizeText(s.rakeNumber);
+        const saleManager = normalizeText(s.rakeManager);
+        if (selectedRake && saleRake && selectedRake !== saleRake) return false;
+        if (selectedManager && saleManager && selectedManager !== saleManager) return false;
+        if (trainId && s.trainId) return String(s.trainId) === String(trainId);
+        return selectedRake || selectedManager ? true : sameTrain;
+      });
     }
 
     function clearCashDashFilters() {
@@ -5608,7 +5625,10 @@ function showPage(page) {
       const trainId = document.getElementById('cashTrainId').value;
       const trainNumber = document.getElementById('cashTrainNo')?.value || '';
       const trainName = document.getElementById('cashTrainSearch')?.value || '';
-      const salesEntry = date && (trainId || trainNumber || trainName) ? findSalesEntryForCash(date, trainId, trainNumber, trainName) : null;
+      const selected = trainId ? (appData.trainMasters || []).find(t => String(t.id) === String(trainId)) : null;
+      const salesEntry = date && (trainId || trainNumber || trainName)
+        ? findSalesEntryForCash(date, trainId, trainNumber, trainName, selected?.rakeManager || '', selected?.rakeNumber || '')
+        : null;
       if (salesEntry) {
         document.getElementById('cashGpFromSales').value = Number(salesEntry.amountToCollect || salesEntry.salesAchievement || salesEntry.totalSale) || 0;
         document.getElementById('cashTrainManager').value = salesEntry.trainManager || '';
@@ -5616,7 +5636,9 @@ function showPage(page) {
         if (salesEntry.yard) document.getElementById('cashYard').value = salesEntry.yard;
       } else if (date && (trainId || trainNumber || trainName)) {
         document.getElementById('cashGpFromSales').value = '';
-        showAlert('Sales entry is required for the same train and date before cash deposit.', 'warning');
+        document.getElementById('cashTrainManager').value = selected?.trainManager || '';
+        document.getElementById('cashRakeManager').value = selected?.rakeManager || '';
+        showAlert('Sales entry is required for the same train, same rake manager and date before cash deposit.', 'warning');
       }
       checkShortage();
     }
@@ -5739,7 +5761,23 @@ function showPage(page) {
       }
       const date = document.getElementById('salesDate')?.value || '';
       let options = getRakeOptionsForTrainRack(master.trainNumber, master.trainName, master.rakeNumber, date);
-      if (hasRakeInfo(master) && !options.some(t => String(t.id) === String(master.id))) options = [master, ...options];
+      const selectedKey = normalizeText(selectedRakeManager);
+      const selectedRakeKey = normalizeText(master.rakeNumber);
+      const hasSelectedManager = options.some(t =>
+        normalizeText(t.rakeManager) === selectedKey &&
+        (!selectedRakeKey || normalizeText(t.rakeNumber) === selectedRakeKey)
+      );
+      if (hasRakeInfo(master) && (!hasSelectedManager || !options.some(t => String(t.id) === String(master.id)))) {
+        const savedOption = { ...master };
+        if (selectedRakeManager) {
+          savedOption.id = hasSelectedManager ? savedOption.id : '';
+          savedOption.rakeManager = selectedRakeManager;
+        }
+        options = [savedOption, ...options.filter(t =>
+          !(normalizeText(t.rakeManager) === normalizeText(savedOption.rakeManager) &&
+            normalizeText(t.rakeNumber) === normalizeText(savedOption.rakeNumber))
+        )];
+      }
       if (!options.length) {
         select.innerHTML = '<option value="">No rake manager found</option>';
         return;
@@ -5748,7 +5786,10 @@ function showPage(page) {
         const label = `${t.rakeManager || 'Unassigned'}${t.rakeNumber ? ' - ' + t.rakeNumber : ''}`;
         return `<option value="${t.rakeManager || ''}" data-master-id="${t.id || ''}" data-rake-number="${t.rakeNumber || ''}">${label}</option>`;
       }).join('');
-      if (selectedRakeManager) select.value = selectedRakeManager;
+      if (selectedRakeManager) {
+        const match = Array.from(select.options).find(o => normalizeText(o.value) === normalizeText(selectedRakeManager));
+        if (match) select.value = match.value;
+      }
       if (!select.value && options.length) select.value = options[0].rakeManager || '';
       onSalesRakeManagerChange();
     }
@@ -5763,6 +5804,14 @@ function showPage(page) {
       const date = document.getElementById('salesDate')?.value || '';
       const rakeManager = select.value || '';
       const rakeNumber = selectedOption?.dataset?.rakeNumber || '';
+      const editingEntry = editingId && editingType === 'sales' ? (appData.sales || []).find(s => String(s.id) === String(editingId)) : null;
+      if (editingEntry && normalizeText(editingEntry.rakeManager) === normalizeText(rakeManager)) {
+        document.getElementById('salesYard').value = editingEntry.yard || document.getElementById('salesYard').value;
+        document.getElementById('salesClusterManager').value = editingEntry.clusterManager || document.getElementById('salesClusterManager').value;
+        document.getElementById('salesTrainManager').value = editingEntry.trainManager || document.getElementById('salesTrainManager').value;
+        document.getElementById('salesTrainType').value = editingEntry.trainType || document.getElementById('salesTrainType').value;
+        return;
+      }
       const master = (masterId ? (appData.trainMasters || []).find(t => String(t.id) === String(masterId)) : null)
         || getEffectiveMaster(trainNo, trainName, date, rakeManager, rakeNumber);
       if (!master) return;
@@ -5820,8 +5869,12 @@ function showPage(page) {
       populateSalesRakeManagers(selectedMaster || {
         trainNumber: entry.trainNumber,
         trainName: entry.trainName,
+        yard: entry.yard,
+        clusterManager: entry.clusterManager,
+        trainManager: entry.trainManager,
         rakeNumber: entry.rakeNumber,
         rakeManager: entry.rakeManager,
+        trainType: entry.trainType,
         id: entry.trainId
       }, entry.rakeManager || '');
       document.getElementById('salesTrainType').value = entry.trainType || '';
@@ -6666,8 +6719,8 @@ function showPage(page) {
       if (!date || !yard || !document.getElementById('cashTrainId').value) { showAlert('Please select date, yard and train', 'error'); return; }
       const trainId = document.getElementById('cashTrainId').value;
       const train = trainId ? appData.trainMasters.find(t => t.id == trainId) : null;
-      const salesEntry = train ? findSalesEntryForCash(date, trainId, train.trainNumber, train.trainName) : null;
-      if (!salesEntry) { showAlert('Cash deposit can be saved only after same-day sales entry for this train.', 'error'); return; }
+      const salesEntry = train ? findSalesEntryForCash(date, trainId, train.trainNumber, train.trainName, train.rakeManager, train.rakeNumber) : null;
+      if (!salesEntry) { showAlert('Cash deposit can be saved only after same-day sales entry for this exact train and rake manager.', 'error'); return; }
 
       if (gpFromSales > 0 && (cashDeposit + onlineDeposit) < gpFromSales && !shortageReason) {
         showAlert('Please select a shortage reason. Cash + Online deposit is less than amount to be collected.', 'error');
@@ -6675,7 +6728,7 @@ function showPage(page) {
         return;
       }
 
-      const effective = train ? (resolveSelectedTrainMaster(trainId, train.trainNumber, train.trainName, date) || train) : null;
+      const effective = salesEntry || (train ? (resolveSelectedTrainMaster(trainId, train.trainNumber, train.trainName, date) || train) : null);
       const duplicate = train ? findDuplicateEntry(appData.cash, date, train.trainNumber, train.trainName, editingId) : null;
       if (duplicate && !confirm('Cash deposit data is already available for same train number and date. Overwrite existing entry?')) return;
 
@@ -7630,7 +7683,7 @@ function showPage(page) {
           const trainNumber = normalizeTrainNo(getColumnValue(row, ['Train Number', 'trainnumber', 'TrainNo']) || '');
           const master = getEffectiveMaster(trainNumber, trainName, date);
           if ((trainName || trainNumber) && !master) { skipped++; return; }
-          const salesEntry = master ? findSalesEntryForCash(date, master.id, master.trainNumber, master.trainName) : null;
+          const salesEntry = master ? findSalesEntryForCash(date, master.id, master.trainNumber, master.trainName, master.rakeManager, master.rakeNumber) : null;
           if (!salesEntry) { skipped++; return; }
           const gpFromSales = Math.round(Number(getColumnValue(row, ['Total Sale', 'totalsale', 'Amount To Be Collected', 'Amount To Collect']))) || Math.round(Number(salesEntry.salesAchievement || salesEntry.totalSale) || 0);
           
