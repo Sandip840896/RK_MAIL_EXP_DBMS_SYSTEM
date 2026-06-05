@@ -166,6 +166,11 @@
     #trainManagerSalesSummaryTable tbody tr { display: table; width: 100%; table-layout: fixed; }
     #trainManagerSalesSummaryTable tbody { display: block; max-height: 455px; overflow-y: scroll; scrollbar-gutter: stable; }
     #trainManagerSalesSummaryTable .summary-total-row { position: sticky; top: 0; z-index: 1; font-weight: 700; background: #f8fafc; }
+    .ten-row-scroll { overflow-x: auto; }
+    .ten-row-scroll table { min-width: 760px; }
+    .ten-row-scroll thead,
+    .ten-row-scroll tbody tr { display: table; width: 100%; table-layout: fixed; }
+    .ten-row-scroll tbody { display: block; max-height: 455px; overflow-y: auto; scrollbar-gutter: stable; }
     .compact-table-container { max-height: 430px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
     .compact-table-container table { min-width: 1250px; }
     .compact-table-container thead th { position: sticky; top: 0; z-index: 2; }
@@ -1111,7 +1116,7 @@
                 <i class="fas fa-file-excel"></i>
               </button>
             </div>
-            <div class="table-container">
+            <div class="table-container ten-row-scroll">
               <table id="topTrainsTable">
                 <thead>
                   <tr>
@@ -1139,7 +1144,7 @@
                 <i class="fas fa-file-excel"></i>
               </button>
             </div>
-            <div class="table-container">
+            <div class="table-container ten-row-scroll">
               <table id="repeatComplaintTable">
                 <thead>
                   <tr>
@@ -1167,7 +1172,7 @@
                 <i class="fas fa-file-excel"></i>
               </button>
             </div>
-            <div class="table-container">
+            <div class="table-container ten-row-scroll">
               <table id="complaintFeedbackTable">
                 <thead>
                   <tr>
