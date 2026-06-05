@@ -6858,15 +6858,10 @@ function showPage(page) {
     }
 
     function onMasterClusterChange() {
-      const cluster = document.getElementById('masterClusterManager')?.value || '';
       const trainManagerList = document.getElementById('masterTrainManagerList');
       if (!trainManagerList) return;
       const allTrainManagers = [...new Set([...(appData.trainManagers || []), ...Object.keys(appData.trainManagerHierarchy || {})])].sort();
-      const filtered = allTrainManagers.filter(tm => {
-        const linkedCluster = appData.trainManagerHierarchy?.[tm];
-        return !cluster || !linkedCluster || linkedCluster === cluster;
-      });
-      trainManagerList.innerHTML = filtered.map(tm => `<option value="${tm}"></option>`).join('');
+      trainManagerList.innerHTML = allTrainManagers.map(tm => `<option value="${tm}"></option>`).join('');
       onMasterTrainManagerChange();
     }
 
@@ -6902,10 +6897,6 @@ function showPage(page) {
         validTo = d.toISOString().split('T')[0];
       }
       if (validTo && validTo < validFrom) { showAlert('Validity end date cannot be before start date', 'error'); return; }
-      if (trainManager && clusterManager && appData.trainManagerHierarchy?.[trainManager] && appData.trainManagerHierarchy[trainManager] !== clusterManager) {
-        showAlert('Selected Train Manager reports to a different Cluster Manager. Please correct hierarchy.', 'error');
-        return;
-      }
       ensureYardExists(yard);
 
       const train = {
@@ -6931,7 +6922,7 @@ function showPage(page) {
 
       if (clusterManager && !appData.clusterManagers.includes(clusterManager)) appData.clusterManagers.push(clusterManager);
       if (trainManager && !appData.trainManagers.includes(trainManager)) appData.trainManagers.push(trainManager);
-      if (trainManager && clusterManager) appData.trainManagerHierarchy[trainManager] = clusterManager;
+      if (trainManager && clusterManager && !appData.trainManagerHierarchy[trainManager]) appData.trainManagerHierarchy[trainManager] = clusterManager;
       if (rakeManager && trainManager && !appData.rakeManagerHierarchy[rakeManager]) appData.rakeManagerHierarchy[rakeManager] = trainManager;
       if (rakeManager && !appData.rakeManagers.includes(rakeManager)) appData.rakeManagers.push(rakeManager);
 
@@ -7724,7 +7715,7 @@ function showPage(page) {
 
           if (train.trainName && train.trainNumber && train.rakeNumber) {
             ensureYardExists(train.yard);
-            if (train.trainManager && train.clusterManager) appData.trainManagerHierarchy[train.trainManager] = train.clusterManager;
+            if (train.trainManager && train.clusterManager && !appData.trainManagerHierarchy[train.trainManager]) appData.trainManagerHierarchy[train.trainManager] = train.clusterManager;
             if (train.rakeManager && train.trainManager && !appData.rakeManagerHierarchy[train.rakeManager]) appData.rakeManagerHierarchy[train.rakeManager] = train.trainManager;
             if (train.rakeManager && !appData.rakeManagers.includes(train.rakeManager)) appData.rakeManagers.push(train.rakeManager);
 
