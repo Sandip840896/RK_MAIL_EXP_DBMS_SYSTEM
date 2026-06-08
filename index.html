@@ -160,7 +160,9 @@
     .form-field input:focus, .form-field select:focus, .form-field textarea:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15); }
     .form-field input:read-only { background: #f1f5f9; color: #64748b; }
     .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .rake-summary-scroll { overflow-x: auto; }
+    .rake-summary-scroll { overflow-x: auto; max-height: 515px; overflow-y: auto; scrollbar-gutter: stable; }
+    .rank-table-scroll { overflow-x: auto; max-height: 515px; overflow-y: auto; scrollbar-gutter: stable; }
+    .pending-deposit-scroll { overflow-x: auto; max-height: 515px; overflow-y: auto; scrollbar-gutter: stable; }
     #trainManagerSalesSummaryTable { min-width: 900px; }
     #trainManagerSalesSummaryTable thead,
     #trainManagerSalesSummaryTable tbody tr { display: table; width: 100%; table-layout: fixed; }
@@ -174,6 +176,10 @@
     .compact-table-container { max-height: 430px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
     .compact-table-container table { min-width: 1250px; }
     .compact-table-container thead th { position: sticky; top: 0; z-index: 2; }
+    .amount-with-detail { display: grid; grid-template-columns: 1fr 42px; gap: 8px; align-items: center; }
+    .detail-lines-table input { min-width: 90px; }
+    .detail-lines-table .item-input { min-width: 180px; }
+    .modal-wide { max-width: 860px; }
     .table-filter-row th { top: 35px; background: #fff; z-index: 3; padding: 6px; }
     .table-filter-row input, .table-filter-row select { width: 100%; min-width: 90px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 11px; text-transform: none; }
     .master-values-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
@@ -871,6 +877,7 @@
                 <thead>
                   <tr>
                     <th>Rake Manager</th>
+                    <th>Mobile Number</th>
                     <th>Trains</th>
                     <th>Entries</th>
                     <th>Total Sale</th>
@@ -894,7 +901,7 @@
                 <i class="fas fa-file-excel"></i>
               </button>
             </div>
-            <div class="table-container">
+            <div class="table-container rank-table-scroll">
               <table id="rankTable">
                 <thead>
                   <tr>
@@ -1280,16 +1287,23 @@
                   </div>
                 </div>
                 <div class="form-field">
-                  <label>Date *</label>
-                  <input type="date" id="salesDate" value="" onchange="refreshSalesTargetForDate()">
-                </div>
-                <div class="form-field">
                   <label>Train Number</label>
                   <input type="text" id="salesTrainNo" readonly>
                 </div>
                 <div class="form-field">
                   <label>Yard</label>
                   <input type="text" id="salesYard" readonly>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-field">
+                  <label>Departure Date *</label>
+                  <input type="date" id="salesDepartureDate" value="" onchange="onSalesDatesChange()">
+                </div>
+                <div class="form-field">
+                  <label>Arrival Date *</label>
+                  <input type="date" id="salesDate" value="" onchange="onSalesDatesChange()">
                 </div>
               </div>
 
@@ -1321,7 +1335,10 @@
                 </div>
                 <div class="form-field">
                   <label>Total Sale *</label>
-                  <input type="number" id="salesAchievement" oninput="calculateSalesCostsAndGp()">
+                  <div class="amount-with-detail">
+                    <input type="number" id="salesAchievement" oninput="calculateSalesCostsAndGp()">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('totalSale')" title="Add detail"><i class="fas fa-list"></i></button>
+                  </div>
                 </div>
                 <div class="form-field">
                   <label>Achievement %</label>
@@ -1332,23 +1349,38 @@
               <div class="form-row">
                 <div class="form-field">
                   <label>Store Bill</label>
-                  <input type="number" id="salesStoreBill" oninput="calculateSalesCostsAndGp()">
+                  <div class="amount-with-detail">
+                    <input type="number" id="salesStoreBill" oninput="calculateSalesCostsAndGp()">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('storeBill')" title="Add detail"><i class="fas fa-list"></i></button>
+                  </div>
                 </div>
                 <div class="form-field">
                   <label>Base Expenses</label>
-                  <input type="number" id="salesBaseExpense" oninput="calculateSalesCostsAndGp()">
+                  <div class="amount-with-detail">
+                    <input type="number" id="salesBaseExpense" oninput="calculateSalesCostsAndGp()">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('baseExpense')" title="Add detail"><i class="fas fa-list"></i></button>
+                  </div>
                 </div>
                 <div class="form-field">
                   <label>Credit Expenses</label>
-                  <input type="number" id="salesCreditExpense" oninput="calculateSalesCostsAndGp()">
+                  <div class="amount-with-detail">
+                    <input type="number" id="salesCreditExpense" oninput="calculateSalesCostsAndGp()">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('creditExpense')" title="Add detail"><i class="fas fa-list"></i></button>
+                  </div>
                 </div>
                 <div class="form-field">
                   <label>Cash Expenses</label>
-                  <input type="number" id="salesCashExpense" oninput="calculateSalesCostsAndGp()">
+                  <div class="amount-with-detail">
+                    <input type="number" id="salesCashExpense" oninput="calculateSalesCostsAndGp()">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('cashExpense')" title="Add detail"><i class="fas fa-list"></i></button>
+                  </div>
                 </div>
                 <div class="form-field">
                   <label>MISC Expenses</label>
-                  <input type="number" id="salesMiscExpense" oninput="calculateSalesCostsAndGp()">
+                  <div class="amount-with-detail">
+                    <input type="number" id="salesMiscExpense" oninput="calculateSalesCostsAndGp()">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('miscExpense')" title="Add detail"><i class="fas fa-list"></i></button>
+                  </div>
                 </div>
                 <div class="form-field">
                   <label>Commission (10% Of Sales)</label>
@@ -1356,15 +1388,21 @@
                 </div>
                 <div class="form-field">
                   <label>Staff Salary</label>
-                  <input type="number" id="salesStaffSalary" oninput="calculateSalesCostsAndGp()">
+                  <input type="number" id="salesStaffSalary" readonly>
                 </div>
                 <div class="form-field">
                   <label>Rake Manager Salary</label>
-                  <input type="number" id="salesManagerSalary" oninput="calculateSalesCostsAndGp()">
+                  <div class="amount-with-detail">
+                    <input type="number" id="salesManagerSalary" oninput="calculateSalesCostsAndGp()">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openSalaryDetailModal()" title="Add salary detail"><i class="fas fa-user-tie"></i></button>
+                  </div>
                 </div>
                 <div class="form-field">
                   <label>E-Catering</label>
-                  <input type="number" id="salesECatering" oninput="calculateSalesCostsAndGp()">
+                  <div class="amount-with-detail">
+                    <input type="number" id="salesECatering" oninput="calculateSalesCostsAndGp()">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('eCatering')" title="Add detail"><i class="fas fa-list"></i></button>
+                  </div>
                 </div>
               </div>
 
@@ -1921,7 +1959,7 @@
                 <i class="fas fa-file-excel"></i>
               </button>
             </div>
-            <div class="table-container">
+            <div class="table-container pending-deposit-scroll">
               <table id="pendingDepositTable">
                 <thead>
                   <tr>
@@ -1971,8 +2009,12 @@
 
               <div class="form-row">
                 <div class="form-field">
-                  <label>Date *</label>
+                  <label>Entry Date *</label>
                   <input type="date" id="cashDate" value="" onchange="rememberLastCashDate(); updateCashGPFromSales()">
+                </div>
+                <div class="form-field">
+                  <label>Arrival Date</label>
+                  <input type="date" id="cashArrivalDate" readonly>
                 </div>
                 <div class="form-field">
                   <label>Yard *</label>
@@ -2368,6 +2410,35 @@
             </div>
           </div>
 
+          <div class="card hidden" id="masterAuditLogCard">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">Master Entry / Edit Log</h3>
+                <p class="card-subtitle">Visible only to Super Admin users</p>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="downloadTableExcel('masterAuditLogTable', 'master_entry_edit_log')">
+                <i class="fas fa-file-excel"></i>
+              </button>
+            </div>
+            <div class="table-container ten-row-scroll">
+              <table id="masterAuditLogTable">
+                <thead>
+                  <tr>
+                    <th>Date & Time</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Train</th>
+                    <th>Train Number</th>
+                    <th>Rake</th>
+                    <th>Rake Manager</th>
+                    <th>Detail</th>
+                  </tr>
+                </thead>
+                <tbody id="masterAuditLogTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <div class="card">
             <div class="card-header">
               <h3 class="card-title">Sales and GP Target Master</h3>
@@ -2640,6 +2711,59 @@
     </div>
   </div>
 
+  <!-- Sales amount detail modal -->
+  <div id="salesDetailModal" class="modal-overlay">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3 class="modal-title" id="salesDetailModalTitle">Amount Detail</h3>
+        <button class="modal-close" onclick="closeSalesDetailModal()">&times;</button>
+      </div>
+      <div class="table-container">
+        <table class="detail-lines-table">
+          <thead><tr><th>Item</th><th>Rate</th><th>Qty</th><th>Amount</th><th></th></tr></thead>
+          <tbody id="salesDetailLinesBody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:14px;align-items:center;">
+        <button class="btn btn-secondary btn-sm" onclick="addSalesDetailLine()"><i class="fas fa-plus"></i> Add Line</button>
+        <strong>Total: <span id="salesDetailTotal">Rs.0</span></strong>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+        <button class="btn btn-secondary" onclick="closeSalesDetailModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="applySalesDetailModal()">Apply Total</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Salary detail modal -->
+  <div id="salaryDetailModal" class="modal-overlay">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3 class="modal-title">Rake Manager Salary Detail</h3>
+        <button class="modal-close" onclick="closeSalaryDetailModal()">&times;</button>
+      </div>
+      <p class="card-subtitle">Rack Manager base: Rs.25000/month. Assistant Rack Manager base: Rs.21100/month.</p>
+      <div class="table-container">
+        <table class="detail-lines-table">
+          <thead><tr><th>Manager Name</th><th>Phone Number</th><th>Post</th><th>Month Salary</th><th>Salary To Deposit</th><th>Actual Salary</th><th></th></tr></thead>
+          <tbody id="salaryDetailLinesBody"></tbody>
+        </table>
+      </div>
+      <div id="salaryDetailWarning" class="shortage-alert hidden" style="margin-top:12px;">
+        <h4><i class="fas fa-exclamation-triangle"></i> Salary Shortage</h4>
+        <p>Actual salary is less than salary amount to be deposited for one or more managers.</p>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:14px;align-items:center;">
+        <button class="btn btn-secondary btn-sm" onclick="addSalaryDetailLine()"><i class="fas fa-plus"></i> Add Assistant</button>
+        <strong>Total Actual Salary: <span id="salaryDetailTotal">Rs.0</span></strong>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+        <button class="btn btn-secondary" onclick="closeSalaryDetailModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="applySalaryDetailModal()">Apply Salary</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal for editing -->
   <div id="editModal" class="modal-overlay">
     <div class="modal">
@@ -2773,7 +2897,8 @@ console.log("✅ Connected to NEW Firebase");
       targetMasters: [],
       sales: [],
       complaints: [],
-      cash: []
+      cash: [],
+      masterLogs: []
     };
 
     // Complaint nature categories for analysis
@@ -2814,6 +2939,9 @@ console.log("✅ Connected to NEW Firebase");
     let compChartFilter = { type: null, value: null };
     let pendingSalesEntry = null;
     let pendingSalesReopen = null;
+    let salesCostDetails = {};
+    let salesSalaryDetails = [];
+    let currentSalesDetailField = '';
     const MASTER_DELETE_KEY = 'RKRESET2026';
     const noDataPopupShown = { sales: false, complaints: false, cash: false };
 
@@ -2933,6 +3061,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!appData.sales) appData.sales = DEFAULT_DATA.sales;
       if (!appData.complaints) appData.complaints = DEFAULT_DATA.complaints;
       if (!appData.cash) appData.cash = DEFAULT_DATA.cash;
+      if (!appData.masterLogs) appData.masterLogs = [];
       if (!appData.deletedRecords) appData.deletedRecords = {};
       if (!appData.users) appData.users = DEFAULT_DATA.users;
       hydrateManagerHierarchyFromMasters();
@@ -3083,6 +3212,7 @@ console.log("✅ Connected to NEW Firebase");
     function deleteAllTrainMasters() {
       if (!ensureEditable('delete train manager master') || !requireMasterDeleteKey('delete all train manager master data')) return;
       if (!confirm('Delete ALL train manager master data? Existing sales, complaints and cash entries will remain.')) return;
+      addMasterLog('Delete All Train Masters', {}, `${(appData.trainMasters || []).length} train master rows deleted`);
       appData.trainMasters = [];
       saveData({ forceOverwrite: true });
       showAlert('All train manager master data deleted', 'success');
@@ -3092,6 +3222,7 @@ console.log("✅ Connected to NEW Firebase");
     function deleteAllTargetMasters() {
       if (!ensureEditable('delete target master') || !requireMasterDeleteKey('delete all sales and GP target master data')) return;
       if (!confirm('Delete ALL sales and GP target master data? Existing transaction entries will remain.')) return;
+      addMasterLog('Delete All Target Masters', {}, `${(appData.targetMasters || []).length} target master rows deleted`);
       appData.targetMasters = [];
       saveData({ forceOverwrite: true });
       showAlert('All target master data deleted', 'success');
@@ -3111,6 +3242,7 @@ console.log("✅ Connected to NEW Firebase");
 
     function setDefaultDates() {
       const today = new Date().toISOString().split('T')[0];
+      document.getElementById('salesDepartureDate') && (document.getElementById('salesDepartureDate').value = today);
       document.getElementById('salesDate') && (document.getElementById('salesDate').value = today);
       document.getElementById('complaintDate') && (document.getElementById('complaintDate').value = today);
       document.getElementById('cashDate') && (document.getElementById('cashDate').value = getLastCashEntryDate());
@@ -4177,19 +4309,32 @@ function showPage(page) {
       sales.forEach(s => {
         const manager = s.rakeManager || 'Unassigned';
         if (!groups[manager]) {
-          groups[manager] = { trains: new Set(), entries: 0, totalSale: 0, totalGp: 0, managerSalary: 0 };
+          groups[manager] = { phone: s.rakeManagerPhone || s.rakeManagerContact || '', trains: new Set(), entries: 0, totalSale: 0, totalGp: 0, managerSalary: 0 };
         }
+        if (!groups[manager].phone) groups[manager].phone = s.rakeManagerPhone || s.rakeManagerContact || '';
         if (s.trainName) groups[manager].trains.add(s.trainName);
         groups[manager].entries += 1;
         groups[manager].totalSale += Number(s.salesAchievement || s.totalSale) || 0;
         groups[manager].totalGp += Number(s.gpAchievement) || 0;
-        groups[manager].managerSalary += Number(s.managerSalary) || 0;
+        const salaryLines = Array.isArray(s.salaryDetails) ? s.salaryDetails : [];
+        const mainSalary = salaryLines.length
+          ? salaryLines.filter(line => line.post !== 'Assistant Rack Manager').reduce((sum, line) => sum + (Number(line.actualSalary) || 0), 0)
+          : Number(s.managerSalary) || 0;
+        groups[manager].managerSalary += mainSalary;
+        salaryLines.filter(line => line.post === 'Assistant Rack Manager' && line.managerName).forEach(line => {
+          const assistant = line.managerName || 'Assistant Rack Manager';
+          if (!groups[assistant]) groups[assistant] = { phone: line.phone || '', trains: new Set(), entries: 0, totalSale: 0, totalGp: 0, managerSalary: 0 };
+          if (!groups[assistant].phone) groups[assistant].phone = line.phone || '';
+          if (s.trainName) groups[assistant].trains.add(s.trainName);
+          groups[assistant].entries += 1;
+          groups[assistant].managerSalary += Number(line.actualSalary) || 0;
+        });
       });
       const rows = Object.entries(groups)
         .map(([manager, data]) => ({ manager, ...data, trainCount: data.trains.size }))
         .sort((a, b) => b.totalSale - a.totalSale);
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#64748b;">No sales data available for selected period.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#64748b;">No sales data available for selected period.</td></tr>';
         return;
       }
       const totalTrainSet = new Set();
@@ -4204,6 +4349,7 @@ function showPage(page) {
       tbody.innerHTML = `
         <tr class="summary-total-row">
           <td>Total</td>
+          <td>-</td>
           <td>${totalRow.trainCount}</td>
           <td>${totalRow.entries}</td>
           <td>${formatCurrency(totalRow.totalSale)}</td>
@@ -4213,6 +4359,7 @@ function showPage(page) {
       ` + rows.map(r => `
         <tr>
           <td>${r.manager}</td>
+          <td>${r.phone || '-'}</td>
           <td>${r.trainCount}</td>
           <td>${r.entries}</td>
           <td>${formatCurrency(r.totalSale)}</td>
@@ -5633,11 +5780,15 @@ function showPage(page) {
         document.getElementById('cashGpFromSales').value = Number(salesEntry.amountToCollect || salesEntry.salesAchievement || salesEntry.totalSale) || 0;
         document.getElementById('cashTrainManager').value = salesEntry.trainManager || '';
         document.getElementById('cashRakeManager').value = salesEntry.rakeManager || '';
+        const arrivalInput = document.getElementById('cashArrivalDate');
+        if (arrivalInput) arrivalInput.value = salesEntry.arrivalDate || salesEntry.date || '';
         if (salesEntry.yard) document.getElementById('cashYard').value = salesEntry.yard;
       } else if (date && (trainId || trainNumber || trainName)) {
         document.getElementById('cashGpFromSales').value = '';
         document.getElementById('cashTrainManager').value = selected?.trainManager || '';
         document.getElementById('cashRakeManager').value = selected?.rakeManager || '';
+        const arrivalInput = document.getElementById('cashArrivalDate');
+        if (arrivalInput) arrivalInput.value = '';
         showAlert('Sales entry is required for the same train, same rake manager and date before cash deposit.', 'warning');
       }
       checkShortage();
@@ -5784,7 +5935,8 @@ function showPage(page) {
       }
       select.innerHTML = options.map(t => {
         const label = `${t.rakeManager || 'Unassigned'}${t.rakeNumber ? ' - ' + t.rakeNumber : ''}`;
-        return `<option value="${t.rakeManager || ''}" data-master-id="${t.id || ''}" data-rake-number="${t.rakeNumber || ''}">${label}</option>`;
+        const phone = t.rakeManagerContact || t.rakeManagerPhone || '';
+        return `<option value="${t.rakeManager || ''}" data-master-id="${t.id || ''}" data-rake-number="${t.rakeNumber || ''}" data-phone="${phone}">${label}</option>`;
       }).join('');
       if (selectedRakeManager) {
         const match = Array.from(select.options).find(o => normalizeText(o.value) === normalizeText(selectedRakeManager));
@@ -5804,12 +5956,14 @@ function showPage(page) {
       const date = document.getElementById('salesDate')?.value || '';
       const rakeManager = select.value || '';
       const rakeNumber = selectedOption?.dataset?.rakeNumber || '';
+      if (!editingId || editingType !== 'sales') salesSalaryDetails = [];
       const editingEntry = editingId && editingType === 'sales' ? (appData.sales || []).find(s => String(s.id) === String(editingId)) : null;
       if (editingEntry && normalizeText(editingEntry.rakeManager) === normalizeText(rakeManager)) {
         document.getElementById('salesYard').value = editingEntry.yard || document.getElementById('salesYard').value;
         document.getElementById('salesClusterManager').value = editingEntry.clusterManager || document.getElementById('salesClusterManager').value;
         document.getElementById('salesTrainManager').value = editingEntry.trainManager || document.getElementById('salesTrainManager').value;
         document.getElementById('salesTrainType').value = editingEntry.trainType || document.getElementById('salesTrainType').value;
+        calculateSalesCostsAndGp();
         return;
       }
       const master = (masterId ? (appData.trainMasters || []).find(t => String(t.id) === String(masterId)) : null)
@@ -5820,6 +5974,7 @@ function showPage(page) {
       document.getElementById('salesClusterManager').value = master.clusterManager || '';
       document.getElementById('salesTrainManager').value = master.trainManager || '';
       document.getElementById('salesTrainType').value = master.trainType || '';
+      calculateSalesCostsAndGp();
     }
 
     function calculateSalesPct() {
@@ -5860,7 +6015,10 @@ function showPage(page) {
       editingType = 'sales';
       document.getElementById('salesTrainId').value = entry.trainId || '';
       document.getElementById('salesTrainSearch').value = entry.trainName || '';
+      document.getElementById('salesDepartureDate').value = entry.departureDate || entry.date || '';
       document.getElementById('salesDate').value = entry.date || '';
+      salesCostDetails = JSON.parse(JSON.stringify(entry.detailLines || entry.salesCostDetails || {}));
+      salesSalaryDetails = JSON.parse(JSON.stringify(entry.salaryDetails || []));
       document.getElementById('salesTrainNo').value = entry.trainNumber || '';
       document.getElementById('salesYard').value = entry.yard || '';
       document.getElementById('salesClusterManager').value = entry.clusterManager || '';
@@ -5952,6 +6110,190 @@ function showPage(page) {
       if (cashStatus.completed) requestSalesReopenApproval(existing);
     }
 
+    const SALES_DETAIL_CONFIG = {
+      totalSale: { inputId: 'salesAchievement', label: 'Total Sale' },
+      storeBill: { inputId: 'salesStoreBill', label: 'Store Bill' },
+      baseExpense: { inputId: 'salesBaseExpense', label: 'Base Expenses' },
+      creditExpense: { inputId: 'salesCreditExpense', label: 'Credit Expenses' },
+      cashExpense: { inputId: 'salesCashExpense', label: 'Cash Expenses' },
+      miscExpense: { inputId: 'salesMiscExpense', label: 'MISC Expenses' },
+      eCatering: { inputId: 'salesECatering', label: 'E-Catering' }
+    };
+
+    function onSalesDatesChange() {
+      refreshSalesTargetForDate();
+      calculateSalesCostsAndGp();
+    }
+
+    function getSalesTripDays() {
+      const dep = document.getElementById('salesDepartureDate')?.value;
+      const arr = document.getElementById('salesDate')?.value;
+      if (!dep || !arr) return 1;
+      const start = new Date(dep);
+      const end = new Date(arr);
+      const diff = Math.round((end - start) / 86400000);
+      return Math.max(diff || 1, 1);
+    }
+
+    function getAutoStaffSalary(totalSale) {
+      const trainType = normalizeText(document.getElementById('salesTrainType')?.value);
+      return trainType === normalizeText('WCB') ? Math.round((Number(totalSale) || 0) * 0.03) : 0;
+    }
+
+    function openSalesDetailModal(field) {
+      currentSalesDetailField = field;
+      const config = SALES_DETAIL_CONFIG[field];
+      if (!config) return;
+      salesCostDetails[field] = Array.isArray(salesCostDetails[field]) ? salesCostDetails[field] : [];
+      if (!salesCostDetails[field].length) salesCostDetails[field].push({ item: '', rate: 0, qty: 1, amount: 0 });
+      document.getElementById('salesDetailModalTitle').textContent = `${config.label} Detail`;
+      renderSalesDetailLines();
+      document.getElementById('salesDetailModal').classList.add('active');
+    }
+
+    function closeSalesDetailModal() {
+      document.getElementById('salesDetailModal').classList.remove('active');
+      currentSalesDetailField = '';
+    }
+
+    function renderSalesDetailLines() {
+      const rows = salesCostDetails[currentSalesDetailField] || [];
+      const tbody = document.getElementById('salesDetailLinesBody');
+      tbody.innerHTML = rows.map((line, index) => `
+        <tr>
+          <td><input class="item-input" value="${line.item || ''}" oninput="updateSalesDetailLine(${index}, 'item', this.value)"></td>
+          <td><input type="number" value="${Number(line.rate) || 0}" oninput="updateSalesDetailLine(${index}, 'rate', this.value)"></td>
+          <td><input type="number" value="${Number(line.qty) || 0}" oninput="updateSalesDetailLine(${index}, 'qty', this.value)"></td>
+          <td><input type="number" value="${Number(line.amount) || 0}" oninput="updateSalesDetailLine(${index}, 'amount', this.value)"></td>
+          <td><button class="btn-icon delete" onclick="removeSalesDetailLine(${index})"><i class="fas fa-trash"></i></button></td>
+        </tr>
+      `).join('');
+      document.getElementById('salesDetailTotal').textContent = formatCurrency(getSalesDetailTotal(currentSalesDetailField));
+    }
+
+    function updateSalesDetailLine(index, key, value) {
+      const rows = salesCostDetails[currentSalesDetailField] || [];
+      if (!rows[index]) return;
+      rows[index][key] = key === 'item' ? value : Number(value) || 0;
+      if (key === 'rate' || key === 'qty') {
+        rows[index].amount = Math.round((Number(rows[index].rate) || 0) * (Number(rows[index].qty) || 0));
+        const amountInput = document.querySelectorAll('#salesDetailLinesBody tr')[index]?.querySelectorAll('input')[3];
+        if (amountInput) amountInput.value = rows[index].amount;
+      }
+      document.getElementById('salesDetailTotal').textContent = formatCurrency(getSalesDetailTotal(currentSalesDetailField));
+    }
+
+    function addSalesDetailLine() {
+      if (!salesCostDetails[currentSalesDetailField]) salesCostDetails[currentSalesDetailField] = [];
+      salesCostDetails[currentSalesDetailField].push({ item: '', rate: 0, qty: 1, amount: 0 });
+      renderSalesDetailLines();
+    }
+
+    function removeSalesDetailLine(index) {
+      salesCostDetails[currentSalesDetailField].splice(index, 1);
+      if (!salesCostDetails[currentSalesDetailField].length) salesCostDetails[currentSalesDetailField].push({ item: '', rate: 0, qty: 1, amount: 0 });
+      renderSalesDetailLines();
+    }
+
+    function getSalesDetailTotal(field) {
+      return (salesCostDetails[field] || []).reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
+    }
+
+    function applySalesDetailModal() {
+      const config = SALES_DETAIL_CONFIG[currentSalesDetailField];
+      if (!config) return;
+      document.getElementById(config.inputId).value = Math.round(getSalesDetailTotal(currentSalesDetailField));
+      closeSalesDetailModal();
+      calculateSalesCostsAndGp();
+    }
+
+    function buildDefaultSalaryDetails() {
+      const select = document.getElementById('salesRakeManager');
+      const selected = select?.selectedOptions?.[0];
+      return [{
+        managerName: select?.value || '',
+        phone: selected?.dataset?.phone || '',
+        post: 'Rack Manager',
+        monthSalary: 25000,
+        salaryToDeposit: 0,
+        actualSalary: Number(document.getElementById('salesManagerSalary')?.value) || 0
+      }];
+    }
+
+    function recalcSalaryDetails() {
+      const days = getSalesTripDays();
+      salesSalaryDetails = (salesSalaryDetails || []).map(row => {
+        const monthSalary = row.post === 'Assistant Rack Manager' ? 21100 : 25000;
+        return { ...row, monthSalary, salaryToDeposit: Math.round((monthSalary / 30) * days) };
+      });
+    }
+
+    function openSalaryDetailModal() {
+      if (!salesSalaryDetails.length) salesSalaryDetails = buildDefaultSalaryDetails();
+      recalcSalaryDetails();
+      renderSalaryDetailLines();
+      document.getElementById('salaryDetailModal').classList.add('active');
+    }
+
+    function closeSalaryDetailModal() {
+      document.getElementById('salaryDetailModal').classList.remove('active');
+    }
+
+    function renderSalaryDetailLines() {
+      recalcSalaryDetails();
+      const tbody = document.getElementById('salaryDetailLinesBody');
+      tbody.innerHTML = salesSalaryDetails.map((line, index) => `
+        <tr>
+          <td><input value="${line.managerName || ''}" ${index === 0 ? 'readonly' : ''} oninput="updateSalaryDetailLine(${index}, 'managerName', this.value)"></td>
+          <td><input value="${line.phone || ''}" oninput="updateSalaryDetailLine(${index}, 'phone', this.value)"></td>
+          <td>
+            <select onchange="updateSalaryDetailLine(${index}, 'post', this.value)">
+              <option ${line.post === 'Rack Manager' ? 'selected' : ''}>Rack Manager</option>
+              <option ${line.post === 'Assistant Rack Manager' ? 'selected' : ''}>Assistant Rack Manager</option>
+            </select>
+          </td>
+          <td><input type="number" value="${Number(line.monthSalary) || 0}" readonly></td>
+          <td><input type="number" value="${Number(line.salaryToDeposit) || 0}" readonly></td>
+          <td><input type="number" value="${Number(line.actualSalary) || 0}" oninput="updateSalaryDetailLine(${index}, 'actualSalary', this.value)"></td>
+          <td>${index === 0 ? '' : `<button class="btn-icon delete" onclick="removeSalaryDetailLine(${index})"><i class="fas fa-trash"></i></button>`}</td>
+        </tr>
+      `).join('');
+      const total = salesSalaryDetails.reduce((sum, row) => sum + (Number(row.actualSalary) || 0), 0);
+      const shortage = salesSalaryDetails.some(row => (Number(row.actualSalary) || 0) < (Number(row.salaryToDeposit) || 0));
+      document.getElementById('salaryDetailTotal').textContent = formatCurrency(total);
+      document.getElementById('salaryDetailWarning').classList.toggle('hidden', !shortage);
+    }
+
+    function updateSalaryDetailLine(index, key, value) {
+      if (!salesSalaryDetails[index]) return;
+      salesSalaryDetails[index][key] = key === 'actualSalary' ? Number(value) || 0 : value;
+      if (key === 'post') {
+        renderSalaryDetailLines();
+        return;
+      }
+      const total = salesSalaryDetails.reduce((sum, row) => sum + (Number(row.actualSalary) || 0), 0);
+      const shortage = salesSalaryDetails.some(row => (Number(row.actualSalary) || 0) < (Number(row.salaryToDeposit) || 0));
+      document.getElementById('salaryDetailTotal').textContent = formatCurrency(total);
+      document.getElementById('salaryDetailWarning').classList.toggle('hidden', !shortage);
+    }
+
+    function addSalaryDetailLine() {
+      salesSalaryDetails.push({ managerName: '', phone: '', post: 'Assistant Rack Manager', monthSalary: 21100, salaryToDeposit: 0, actualSalary: 0 });
+      renderSalaryDetailLines();
+    }
+
+    function removeSalaryDetailLine(index) {
+      salesSalaryDetails.splice(index, 1);
+      renderSalaryDetailLines();
+    }
+
+    function applySalaryDetailModal() {
+      const total = salesSalaryDetails.reduce((sum, row) => sum + (Number(row.actualSalary) || 0), 0);
+      document.getElementById('salesManagerSalary').value = Math.round(total);
+      closeSalaryDetailModal();
+      calculateSalesCostsAndGp();
+    }
+
     function getCurrentSalesCostValues() {
       const totalSale = Number(document.getElementById('salesAchievement')?.value) || 0;
       const storeBill = Number(document.getElementById('salesStoreBill')?.value) || 0;
@@ -5960,7 +6302,9 @@ function showPage(page) {
       const cashExpense = Number(document.getElementById('salesCashExpense')?.value) || 0;
       const miscExpense = Number(document.getElementById('salesMiscExpense')?.value) || 0;
       const commission = Math.round(totalSale * 0.10);
-      const staffSalary = Number(document.getElementById('salesStaffSalary')?.value) || 0;
+      const staffSalary = getAutoStaffSalary(totalSale);
+      const staffSalaryInput = document.getElementById('salesStaffSalary');
+      if (staffSalaryInput) staffSalaryInput.value = staffSalary;
       const managerSalary = Number(document.getElementById('salesManagerSalary')?.value) || 0;
       const eCatering = Number(document.getElementById('salesECatering')?.value) || 0;
       const gpAchievement = Math.round(totalSale - (storeBill + baseExpense + creditExpense + cashExpense + miscExpense + commission + staffSalary + managerSalary));
@@ -5995,6 +6339,7 @@ function showPage(page) {
     function validateAndSaveSalesEntry() {
       if (!ensureEditable('save entries')) return;
       const trainId = document.getElementById('salesTrainId').value;
+      const departureDate = document.getElementById('salesDepartureDate')?.value;
       const date = document.getElementById('salesDate').value;
       const salesAchievement = document.getElementById('salesAchievement').value;
       calculateSalesCostsAndGp();
@@ -6002,8 +6347,8 @@ function showPage(page) {
       const gpTarget = Number(document.getElementById('salesGpTarget').value) || 0;
       const remarks = document.getElementById('salesRemarks').value.trim();
 
-      if (!trainId || !date || !salesAchievement) {
-        showAlert('Please fill train, date and total sale', 'error');
+      if (!trainId || !departureDate || !date || !salesAchievement) {
+        showAlert('Please fill train, departure date, arrival date and total sale', 'error');
         return;
       }
 
@@ -6053,6 +6398,7 @@ function showPage(page) {
     function saveSalesEntryDirect() {
       if (!ensureEditable('save entries')) return;
       const trainId = document.getElementById('salesTrainId').value;
+      const departureDate = document.getElementById('salesDepartureDate')?.value || document.getElementById('salesDate').value;
       const date = document.getElementById('salesDate').value;
       const salesAchievement = document.getElementById('salesAchievement').value;
       const gpAchievement = document.getElementById('salesGpAchievement').value;
@@ -6078,6 +6424,8 @@ function showPage(page) {
       const entry = {
         id: editingId || Date.now(),
         date: date,
+        departureDate: departureDate,
+        arrivalDate: date,
         month: new Date(date).toLocaleString('en-US', { month: 'short' }),
         trainId: effectiveTrain.id || trainId,
         trainName: effectiveTrain.trainName || train.trainName,
@@ -6105,6 +6453,8 @@ function showPage(page) {
         managerSalary: Math.round(salesCosts.managerSalary),
         eCatering: Math.round(salesCosts.eCatering),
         amountToCollect: Math.round(salesCosts.amountToCollect),
+        detailLines: JSON.parse(JSON.stringify(salesCostDetails || {})),
+        salaryDetails: JSON.parse(JSON.stringify(salesSalaryDetails || [])),
         salesReopenedAfterCash: existingForEdit?.salesReopenedAfterCash || false,
         salesReopenApprovedBy: existingForEdit?.salesReopenApprovedBy || '',
         salesReopenApprovedAt: existingForEdit?.salesReopenApprovedAt || '',
@@ -6135,9 +6485,14 @@ function showPage(page) {
       editingType = null;
       pendingSalesEntry = null;
       pendingSalesReopen = null;
+      salesCostDetails = {};
+      salesSalaryDetails = [];
+      currentSalesDetailField = '';
       setSalesEntryFieldsDisabled(false);
       document.getElementById('salesTrainId').value = '';
       document.getElementById('salesTrainSearch').value = '';
+      document.getElementById('salesDepartureDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('salesDate').value = new Date().toISOString().split('T')[0];
       document.getElementById('salesTrainNo').value = '';
       document.getElementById('salesYard').value = '';
       document.getElementById('salesClusterManager').value = '';
@@ -6735,6 +7090,8 @@ function showPage(page) {
       const entry = {
         id: editingId || Date.now(),
         date: date,
+        entryDate: date,
+        arrivalDate: salesEntry?.arrivalDate || salesEntry?.date || date,
         yard: yard,
         trainId: trainId,
         trainName: train ? train.trainName : '',
@@ -6779,6 +7136,7 @@ function showPage(page) {
       editingId = null;
       editingType = null;
       document.getElementById('cashDate').value = getLastCashEntryDate();
+      document.getElementById('cashArrivalDate') && (document.getElementById('cashArrivalDate').value = '');
       document.getElementById('cashYard').value = appData.yards[0] || '';
       document.getElementById('cashTrainId').value = '';
       document.getElementById('cashTrainSearch').value = '';
@@ -6857,6 +7215,7 @@ function showPage(page) {
       editingType = 'cash';
       
       document.getElementById('cashDate').value = c.date;
+      document.getElementById('cashArrivalDate') && (document.getElementById('cashArrivalDate').value = c.arrivalDate || relatedSale?.arrivalDate || relatedSale?.date || c.date || '');
       document.getElementById('cashYard').value = c.yard;
       document.getElementById('cashTrainId').value = c.trainId || '';
       document.getElementById('cashTrainSearch').value = c.trainName || '';
@@ -6908,6 +7267,7 @@ function showPage(page) {
       document.getElementById('noMasterDataWarning').classList.toggle('hidden', hasData);
       
       loadMasterTable();
+      loadMasterAuditLog();
     }
 
     function updateMasterTargetDisplay() {
@@ -6994,7 +7354,8 @@ function showPage(page) {
       if (rakeManager && trainManager && !appData.rakeManagerHierarchy[rakeManager]) appData.rakeManagerHierarchy[rakeManager] = trainManager;
       if (rakeManager && !appData.rakeManagers.includes(rakeManager)) appData.rakeManagers.push(rakeManager);
 
-      if (editingId && editingType === 'master') {
+      const isEdit = editingId && editingType === 'master';
+      if (isEdit) {
         const index = appData.trainMasters.findIndex(t => t.id == editingId);
         if (index >= 0) appData.trainMasters[index] = train;
       } else {
@@ -7012,12 +7373,15 @@ function showPage(page) {
         appData.trainMasters.push(train);
       }
 
+      addMasterLog(isEdit ? 'Edit Train Master' : 'Add Train Master', train, isEdit ? 'Manual master row updated' : 'Manual master row created');
+
       applyGpTargetToTrain(number, name, train.gpTarget);
 
       saveData();
       clearMasterForm();
       showAlert('Train master saved successfully', 'success');
       loadMasterTable();
+      loadMasterAuditLog();
       updateMasterTargetDisplay();
       document.getElementById('noMasterDataWarning').classList.add('hidden');
     }
@@ -7082,6 +7446,44 @@ function showPage(page) {
       ['masterFilterTrain','masterFilterNumber','masterFilterRakeNo','masterFilterBusinessHead','masterFilterVp','masterFilterValidFrom','masterFilterValidTo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
       ['masterFilterYard','masterFilterType','masterFilterCluster','masterFilterManager','masterFilterRakeManager'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
       loadMasterTable();
+    }
+
+    function addMasterLog(action, row = {}, detail = '') {
+      if (!Array.isArray(appData.masterLogs)) appData.masterLogs = [];
+      appData.masterLogs.unshift({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        timestamp: new Date().toISOString(),
+        user: currentUser?.email || currentUser?.name || 'Unknown',
+        action,
+        trainName: row.trainName || '',
+        trainNumber: normalizeTrainNo(row.trainNumber) || row.trainNumber || '',
+        rakeNumber: row.rakeNumber || '',
+        rakeManager: row.rakeManager || '',
+        detail
+      });
+      appData.masterLogs = appData.masterLogs.slice(0, 500);
+    }
+
+    function loadMasterAuditLog() {
+      const card = document.getElementById('masterAuditLogCard');
+      const tbody = document.getElementById('masterAuditLogTableBody');
+      if (!card || !tbody) return;
+      const canSee = currentUser && currentUser.role === 'super_admin';
+      card.classList.toggle('hidden', !canSee);
+      if (!canSee) return;
+      const rows = [...(appData.masterLogs || [])].sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+      tbody.innerHTML = rows.length ? rows.map(log => `
+        <tr>
+          <td>${log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}</td>
+          <td>${log.user || '-'}</td>
+          <td>${log.action || '-'}</td>
+          <td>${log.trainName || '-'}</td>
+          <td>${log.trainNumber || '-'}</td>
+          <td>${log.rakeNumber || '-'}</td>
+          <td>${log.rakeManager || '-'}</td>
+          <td>${log.detail || '-'}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="8" style="text-align:center;color:#64748b;">No master log available.</td></tr>';
     }
 
     function loadMasterTable() {
@@ -7815,9 +8217,12 @@ function showPage(page) {
         });
 
         saveData();
+        addMasterLog('Import Train Master', {}, `${imported} train master rows imported/updated, ${skipped} skipped`);
+        saveData();
         input.value = '';
         showAlert(`${imported} train masters imported/updated successfully, ${skipped} skipped`, 'success');
         loadMasterTable();
+        loadMasterAuditLog();
         loadTargetMasterTable();
         updateMasterTargetDisplay();
         document.getElementById('noMasterDataWarning').classList.add('hidden');
@@ -7880,9 +8285,12 @@ function showPage(page) {
         });
 
         saveData();
+        addMasterLog('Import Sales & GP Target', {}, `${imported} target rows imported/updated, ${skipped} skipped`);
+        saveData();
         input.value = '';
         showAlert(`Sales and GP target import complete: ${imported} imported/updated, ${skipped} skipped`, 'success');
         loadTargetMasterTable();
+        loadMasterAuditLog();
         updateMasterTargetDisplay();
       } catch (error) { showAlert('Import failed: ' + error.message, 'error'); }
     }
@@ -8131,6 +8539,8 @@ function showPage(page) {
       const rows = getFilteredSalesEntriesFromListFilters();
       if (!rows.length) { showAlert('No sales entries found for selected filters.', 'warning'); return; }
       const exportRows = rows.map(s => ({
+        'Departure Date': s.departureDate || s.date || '',
+        'Arrival Date': s.arrivalDate || s.date || '',
         Date: s.date || '',
         Yard: s.yard || '',
         'Train Name': s.trainName || '',
@@ -8160,6 +8570,8 @@ function showPage(page) {
       const rows = getFilteredComplaintEntriesFromListFilters();
       if (!rows.length) { showAlert('No complaint entries found for selected filters.', 'warning'); return; }
       const exportRows = rows.map(c => ({
+        'Entry Date': c.entryDate || c.date || '',
+        'Arrival Date': c.arrivalDate || c.date || '',
         Date: c.date || '',
         Status: c.status || '',
         'Complaint ID': c.complaintId || '',
@@ -8386,6 +8798,7 @@ function showPage(page) {
         if (cloudData.sales) appData.sales = cloudData.sales;
         if (cloudData.complaints) appData.complaints = cloudData.complaints;
         if (cloudData.cash) appData.cash = cloudData.cash;
+        if (cloudData.masterLogs) appData.masterLogs = cloudData.masterLogs;
         
         saveData();
         
@@ -8496,6 +8909,7 @@ function showPage(page) {
         sales: source.sales || [],
         complaints: source.complaints || [],
         cash: source.cash || [],
+        masterLogs: source.masterLogs || [],
         deletedRecords: source.deletedRecords || {}
       };
     }
@@ -8514,6 +8928,7 @@ function showPage(page) {
         sales: mergeArrayByKey(cloudData.sales, localData.sales, getDeletedSet('sales', cloudData, localData)),
         complaints: mergeArrayByKey(cloudData.complaints, localData.complaints, getDeletedSet('complaints', cloudData, localData)),
         cash: mergeArrayByKey(cloudData.cash, localData.cash, getDeletedSet('cash', cloudData, localData)),
+        masterLogs: mergeArrayByKey(cloudData.masterLogs, localData.masterLogs, getDeletedSet('masterLogs', cloudData, localData)),
         deletedRecords: { ...(cloudData.deletedRecords || {}), ...(localData.deletedRecords || {}) }
       };
     }
