@@ -2451,7 +2451,13 @@
                 </button>
               </div>
             </div>
-            <div class="table-container">
+            <div class="filter-row" style="margin-bottom: 12px;">
+              <div class="filter-item">
+                <label>Search Target Master</label>
+                <input type="text" id="targetMasterSearch" placeholder="Search train, number, date or amount" oninput="loadTargetMasterTable()">
+              </div>
+            </div>
+            <div class="table-container ten-row-scroll">
               <table id="targetMasterTable">
                 <thead>
                   <tr>
@@ -4734,6 +4740,27 @@ function showPage(page) {
       const currentByDate = {}; current.forEach(c => { currentByDate[c.date] = (currentByDate[c.date] || 0) + 1; });
       const prevByDate = {}; prev.forEach(c => { prevByDate[c.date] = (prevByDate[c.date] || 0) + 1; });
       const allDates = [...new Set([...Object.keys(currentByDate), ...Object.keys(prevByDate)])].sort();
+      const complaintValueLabels = {
+        id: 'complaintValueLabels',
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          ctx.save();
+          ctx.font = '600 10px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          chart.data.datasets.forEach((dataset, datasetIndex) => {
+            const meta = chart.getDatasetMeta(datasetIndex);
+            if (meta.hidden) return;
+            meta.data.forEach((point, index) => {
+              const value = Number(dataset.data[index]) || 0;
+              if (!value) return;
+              ctx.fillStyle = dataset.borderColor || '#1e293b';
+              ctx.fillText(String(value), point.x, point.y - 8);
+            });
+          });
+          ctx.restore();
+        }
+      };
 
       if (charts.complaintTrend) charts.complaintTrend.destroy();
       charts.complaintTrend = new Chart(ctx, {
@@ -4760,7 +4787,8 @@ function showPage(page) {
             y: { beginAtZero: true, grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
             x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
           }
-        }
+        },
+        plugins: [complaintValueLabels]
       });
     }
 
@@ -6119,6 +6147,17 @@ function showPage(page) {
       miscExpense: { inputId: 'salesMiscExpense', label: 'MISC Expenses' },
       eCatering: { inputId: 'salesECatering', label: 'E-Catering' }
     };
+    const DEFAULT_MISC_EXPENSE_LINES = [
+      { item: 'POOJA', rate: 51, qty: 1, amount: 51 },
+      { item: 'AUTO', rate: 200, qty: 1, amount: 200 },
+      { item: 'RPF', rate: 200, qty: 1, amount: 200 },
+      { item: 'ICE', rate: 760, qty: 1, amount: 760 },
+      { item: 'FREE', rate: 750, qty: 1, amount: 750 },
+      { item: 'JAR', rate: 200, qty: 1, amount: 200 },
+      { item: 'Room', rate: 0, qty: 1, amount: 0 },
+      { item: 'Irctc', rate: 500, qty: 1, amount: 500 },
+      { item: 'P.Car', rate: 500, qty: 1, amount: 500 }
+    ];
 
     function onSalesDatesChange() {
       refreshSalesTargetForDate();
@@ -6145,6 +6184,9 @@ function showPage(page) {
       const config = SALES_DETAIL_CONFIG[field];
       if (!config) return;
       salesCostDetails[field] = Array.isArray(salesCostDetails[field]) ? salesCostDetails[field] : [];
+      if (field === 'miscExpense' && !salesCostDetails[field].length) {
+        salesCostDetails[field] = JSON.parse(JSON.stringify(DEFAULT_MISC_EXPENSE_LINES));
+      }
       if (!salesCostDetails[field].length) salesCostDetails[field].push({ item: '', rate: 0, qty: 1, amount: 0 });
       document.getElementById('salesDetailModalTitle').textContent = `${config.label} Detail`;
       renderSalesDetailLines();
@@ -7389,7 +7431,21 @@ function showPage(page) {
     function loadTargetMasterTable() {
       const tbody = document.getElementById('targetMasterTableBody');
       if (!tbody) return;
-      const rows = [...(appData.targetMasters || [])].sort((a, b) => (a.trainName || '').localeCompare(b.trainName || '') || (b.validFrom || '').localeCompare(a.validFrom || ''));
+      const search = String(document.getElementById('targetMasterSearch')?.value || '').toLowerCase().trim();
+      const rows = [...(appData.targetMasters || [])]
+        .filter(t => {
+          if (!search) return true;
+          return [
+            t.trainName,
+            t.trainNumber,
+            t.validFrom,
+            t.validTo,
+            t.validDays,
+            t.salesTarget,
+            t.gpTarget
+          ].some(v => String(v || '').toLowerCase().includes(search));
+        })
+        .sort((a, b) => (a.trainName || '').localeCompare(b.trainName || '') || (b.validFrom || '').localeCompare(a.validFrom || ''));
       tbody.innerHTML = rows.length ? rows.map(t => `
         <tr>
           <td>${t.trainName || '-'}</td>
