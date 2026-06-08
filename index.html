@@ -6161,6 +6161,10 @@ function showPage(page) {
 
     function onSalesDatesChange() {
       refreshSalesTargetForDate();
+      if (salesSalaryDetails.length) {
+        recalcSalaryDetails();
+        document.getElementById('salesManagerSalary').value = Math.round(salesSalaryDetails.reduce((sum, row) => sum + (Number(row.actualSalary) || 0), 0));
+      }
       calculateSalesCostsAndGp();
     }
 
@@ -6171,7 +6175,7 @@ function showPage(page) {
       const start = new Date(dep);
       const end = new Date(arr);
       const diff = Math.round((end - start) / 86400000);
-      return Math.max(diff || 1, 1);
+      return Math.max(diff, 0);
     }
 
     function getAutoStaffSalary(totalSale) {
@@ -6252,13 +6256,16 @@ function showPage(page) {
     function buildDefaultSalaryDetails() {
       const select = document.getElementById('salesRakeManager');
       const selected = select?.selectedOptions?.[0];
+      const days = getSalesTripDays();
+      const salaryToDeposit = Math.round((25000 / 30) * days);
       return [{
         managerName: select?.value || '',
         phone: selected?.dataset?.phone || '',
         post: 'Rack Manager',
         monthSalary: 25000,
-        salaryToDeposit: 0,
-        actualSalary: Number(document.getElementById('salesManagerSalary')?.value) || 0
+        salaryToDeposit,
+        actualSalary: salaryToDeposit,
+        manualActual: false
       }];
     }
 
@@ -6266,7 +6273,13 @@ function showPage(page) {
       const days = getSalesTripDays();
       salesSalaryDetails = (salesSalaryDetails || []).map(row => {
         const monthSalary = row.post === 'Assistant Rack Manager' ? 21100 : 25000;
-        return { ...row, monthSalary, salaryToDeposit: Math.round((monthSalary / 30) * days) };
+        const salaryToDeposit = Math.round((monthSalary / 30) * days);
+        return {
+          ...row,
+          monthSalary,
+          salaryToDeposit,
+          actualSalary: row.manualActual ? (Number(row.actualSalary) || 0) : salaryToDeposit
+        };
       });
     }
 
@@ -6309,6 +6322,8 @@ function showPage(page) {
     function updateSalaryDetailLine(index, key, value) {
       if (!salesSalaryDetails[index]) return;
       salesSalaryDetails[index][key] = key === 'actualSalary' ? Number(value) || 0 : value;
+      if (key === 'actualSalary') salesSalaryDetails[index].manualActual = true;
+      if (key === 'post') salesSalaryDetails[index].manualActual = false;
       if (key === 'post') {
         renderSalaryDetailLines();
         return;
@@ -6320,7 +6335,8 @@ function showPage(page) {
     }
 
     function addSalaryDetailLine() {
-      salesSalaryDetails.push({ managerName: '', phone: '', post: 'Assistant Rack Manager', monthSalary: 21100, salaryToDeposit: 0, actualSalary: 0 });
+      const salaryToDeposit = Math.round((21100 / 30) * getSalesTripDays());
+      salesSalaryDetails.push({ managerName: '', phone: '', post: 'Assistant Rack Manager', monthSalary: 21100, salaryToDeposit, actualSalary: salaryToDeposit, manualActual: false });
       renderSalaryDetailLines();
     }
 
