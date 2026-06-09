@@ -3950,10 +3950,11 @@ function showPage(page) {
           },
           plugins: { legend: { labels: { color: '#64748b', font: { size: 10 } } } },
           scales: {
-            y: { beginAtZero: true, grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
+            y: { beginAtZero: true, grace: '12%', grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
             x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
           }
-        }
+        },
+        plugins: [makeBarValueLabelsPlugin('complaintTrainValueLabels')]
       });
     }
 
