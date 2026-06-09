@@ -3975,8 +3975,7 @@ function showPage(page) {
             y: { beginAtZero: true, grace: '12%', grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
             x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
           }
-        },
-        plugins: [makeBarValueLabelsPlugin('complaintTrainValueLabels')]
+        }
       });
     }
 
@@ -4755,26 +4754,35 @@ function showPage(page) {
       return {
         id: pluginId,
         afterDatasetsDraw(chart) {
-          const { ctx } = chart;
-          ctx.save();
-          ctx.font = '600 10px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          chart.data.datasets.forEach((dataset, datasetIndex) => {
-            const meta = chart.getDatasetMeta(datasetIndex);
-            if (meta.hidden) return;
-            meta.data.forEach((bar, index) => {
-              const value = Number(dataset.data[index]) || 0;
-              if (!value) return;
-              const topY = bar.y - 6;
-              const drawInside = topY < chart.chartArea.top + 10;
-              ctx.fillStyle = drawInside ? '#fff' : (dataset.backgroundColor || dataset.borderColor || '#1e293b');
-              ctx.fillText(String(value), bar.x, drawInside ? bar.y + 16 : topY);
-            });
-          });
-          ctx.restore();
+          drawBarValueLabels(chart);
         }
       };
+    }
+
+    function drawBarValueLabels(chart) {
+      if (!chart || !chart.ctx || !chart.chartArea) return;
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = '700 11px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      chart.data.datasets.forEach((dataset, datasetIndex) => {
+        const meta = chart.getDatasetMeta(datasetIndex);
+        if (meta.hidden) return;
+        meta.data.forEach((bar, index) => {
+          const value = Number(dataset.data[index]) || 0;
+          if (!value) return;
+          const props = typeof bar.getProps === 'function' ? bar.getProps(['x', 'y', 'base'], true) : bar;
+          const x = props.x;
+          const y = props.y;
+          const base = props.base || chart.chartArea.bottom;
+          const barHeight = Math.abs(base - y);
+          const drawInside = barHeight > 18;
+          ctx.fillStyle = drawInside ? '#fff' : (Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor[index] : dataset.backgroundColor) || dataset.borderColor || '#1e293b';
+          ctx.fillText(String(value), x, drawInside ? y + 12 : y - 10);
+        });
+      });
+      ctx.restore();
     }
 
     function renderComplaintTrendChart(current, prev) {
@@ -4867,8 +4875,7 @@ function showPage(page) {
             y: { beginAtZero: true, grace: '12%', grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
             x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
           }
-        },
-        plugins: [makeBarValueLabelsPlugin('complaintTrainValueLabels')]
+        }
       });
     }
 
@@ -4904,11 +4911,13 @@ function showPage(page) {
           },
           plugins: { legend: { labels: { color: '#64748b', font: { size: 10 } } } },
           scales: {
-            y: { beginAtZero: true, grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
+            y: { beginAtZero: true, grace: '12%', grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
             x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
           }
-        }
+        },
+        plugins: [makeBarValueLabelsPlugin('complaintTrainValueLabels')]
       });
+      setTimeout(() => drawBarValueLabels(charts.complaintTrain), 80);
     }
 
     function renderComplaintSourceChart(complaints) {
