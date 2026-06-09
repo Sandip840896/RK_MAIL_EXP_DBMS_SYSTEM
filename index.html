@@ -1064,14 +1064,8 @@
             </div>
           </div>
 
-          <!-- Charts Row 1 -->
-          <div class="grid grid-2" style="margin-top: 16px;">
-            <div class="card" id="complaintStatusCard">
-              <h3 class="card-title">Status Comparison <small style="font-size: 10px; color: #64748b;">- Click to filter</small></h3>
-              <div class="chart-container">
-                <canvas id="complaintStatusChart"></canvas>
-              </div>
-            </div>
+          <!-- Train Comparison -->
+          <div style="margin-top: 16px;">
             <div class="card" id="complaintTrainCard">
               <h3 class="card-title">Train-wise Comparison <small style="font-size: 10px; color: #64748b;">- Click to filter</small></h3>
               <div class="chart-container">
@@ -3914,7 +3908,8 @@ function showPage(page) {
             y: { beginAtZero: true, grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
             x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
           }
-        }
+        },
+        plugins: [makeBarValueLabelsPlugin('complaintTrainValueLabels')]
       });
     }
 
@@ -4703,7 +4698,6 @@ function showPage(page) {
       }
 
       renderComplaintTrendChart(complaintsP1, complaintsP2);
-      renderComplaintStatusChart(complaintsP1, complaintsP2);
       renderComplaintTrainChart(complaintsP1, complaintsP2);
       renderComplaintSourceChart(complaintsP1);
       renderComplaintYardChart(complaintsP1, complaintsP2);
@@ -4731,6 +4725,30 @@ function showPage(page) {
       } else {
         display.style.display = 'none';
       }
+    }
+
+    function makeBarValueLabelsPlugin(pluginId = 'barValueLabels') {
+      return {
+        id: pluginId,
+        afterDatasetsDraw(chart) {
+          const { ctx } = chart;
+          ctx.save();
+          ctx.font = '600 10px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          chart.data.datasets.forEach((dataset, datasetIndex) => {
+            const meta = chart.getDatasetMeta(datasetIndex);
+            if (meta.hidden) return;
+            meta.data.forEach((bar, index) => {
+              const value = Number(dataset.data[index]) || 0;
+              if (!value) return;
+              ctx.fillStyle = dataset.backgroundColor || dataset.borderColor || '#1e293b';
+              ctx.fillText(String(value), bar.x, bar.y - 6);
+            });
+          });
+          ctx.restore();
+        }
+      };
     }
 
     function renderComplaintTrendChart(current, prev) {
@@ -5081,7 +5099,8 @@ function showPage(page) {
             y: { beginAtZero: true, grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
             x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 9 }, maxRotation: 45, minRotation: 45 } }
           }
-        }
+        },
+        plugins: [makeBarValueLabelsPlugin('natureAnalysisValueLabels')]
       });
     }
 
