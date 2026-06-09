@@ -6175,7 +6175,7 @@ function showPage(page) {
       const start = new Date(dep);
       const end = new Date(arr);
       const diff = Math.round((end - start) / 86400000);
-      return Math.max(diff, 0);
+      return Math.max(diff + 1, 1);
     }
 
     function getAutoStaffSalary(totalSale) {
