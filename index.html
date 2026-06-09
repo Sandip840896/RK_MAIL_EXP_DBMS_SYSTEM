@@ -3588,6 +3588,8 @@ function showPage(page) {
         if (compChartFilter.type === 'source') filtered = filtered.filter(c => c.source === compChartFilter.value);
         if (compChartFilter.type === 'mobile') filtered = filtered.filter(c => normalizeMobileNo(c.mobileNo) === normalizeMobileNo(compChartFilter.value));
         if (compChartFilter.type === 'date') filtered = filtered.filter(c => c.date === compChartFilter.value);
+        if (compChartFilter.type === 'nature') filtered = filtered.filter(c => (c.complainNature || c.complaintType || 'Unknown') === compChartFilter.value);
+        if (compChartFilter.type === 'rakeManager') filtered = filtered.filter(c => getRakeManagerFromComplaint(c) === compChartFilter.value);
       }
 
       if (currentUser.yard !== 'ALL') {
@@ -3667,6 +3669,16 @@ function showPage(page) {
 
     function clearCompChartFilter() {
       compChartFilter = { type: null, value: null };
+      loadComplaintDashboard();
+    }
+
+    function toggleComplaintChartFilter(type, value) {
+      const decoded = decodeURIComponent(value);
+      if (compChartFilter.type === type && compChartFilter.value === decoded) {
+        compChartFilter = { type: null, value: null };
+      } else {
+        compChartFilter = { type, value: decoded };
+      }
       loadComplaintDashboard();
     }
 
@@ -4797,8 +4809,7 @@ function showPage(page) {
           onClick: (e, elements) => {
             if (elements.length > 0) {
               const index = elements[0].index;
-              compChartFilter = { type: 'date', value: allDates[index] };
-              loadComplaintDashboard();
+              toggleComplaintChartFilter('date', allDates[index]);
             }
           },
           plugins: { legend: { labels: { color: '#64748b', font: { size: 10 } } } },
@@ -4835,8 +4846,7 @@ function showPage(page) {
           onClick: (e, elements) => {
             if (elements.length > 0) {
               const index = elements[0].index;
-              compChartFilter = { type: 'status', value: statuses[index] };
-              loadComplaintDashboard();
+              toggleComplaintChartFilter('status', statuses[index]);
             }
           },
           plugins: { legend: { labels: { color: '#64748b', font: { size: 10 } } } },
@@ -4875,8 +4885,7 @@ function showPage(page) {
           onClick: (e, elements) => {
             if (elements.length > 0) {
               const index = elements[0].index;
-              compChartFilter = { type: 'train', value: sorted[index][0] };
-              loadComplaintDashboard();
+              toggleComplaintChartFilter('train', sorted[index][0]);
             }
           },
           plugins: { legend: { labels: { color: '#64748b', font: { size: 10 } } } },
@@ -4911,8 +4920,7 @@ function showPage(page) {
           onClick: (e, elements) => {
             if (elements.length > 0) {
               const index = elements[0].index;
-              compChartFilter = { type: 'source', value: Object.keys(sourceMap)[index] };
-              loadComplaintDashboard();
+              toggleComplaintChartFilter('source', Object.keys(sourceMap)[index]);
             }
           },
           plugins: {
@@ -5004,6 +5012,12 @@ function showPage(page) {
           responsive: true,
           maintainAspectRatio: false,
           cutout: '60%',
+          onClick: (e, elements) => {
+            if (elements.length > 0) {
+              const index = elements[0].index;
+              toggleComplaintChartFilter('rakeManager', managers[index]);
+            }
+          },
           plugins: { 
             legend: { 
               position: 'bottom', 
@@ -5095,6 +5109,12 @@ function showPage(page) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          onClick: (e, elements) => {
+            if (elements.length > 0) {
+              const index = elements[0].index;
+              toggleComplaintChartFilter('nature', natures[index]);
+            }
+          },
           plugins: { legend: { labels: { color: '#64748b', font: { size: 10 } } } },
           scales: {
             y: { beginAtZero: true, grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
@@ -6643,8 +6663,7 @@ function showPage(page) {
     }
 
     function applyComplaintFilter(type, value) {
-      compChartFilter = { type, value: decodeURIComponent(value) };
-      loadComplaintDashboard();
+      toggleComplaintChartFilter(type, value);
     }
 
     function editSalesEntry(id) {
@@ -9165,6 +9184,7 @@ function showPage(page) {
     window.applyChartFilter = applyChartFilter;
     window.clearChartFilter = clearChartFilter;
     window.clearCompChartFilter = clearCompChartFilter;
+    window.toggleComplaintChartFilter = toggleComplaintChartFilter;
     window.applyComplaintFilter = applyComplaintFilter;
     window.updateCashGPFromSales = updateCashGPFromSales;
     window.checkShortage = checkShortage;
