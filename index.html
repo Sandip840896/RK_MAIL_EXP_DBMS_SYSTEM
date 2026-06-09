@@ -2937,6 +2937,7 @@ console.log("✅ Connected to NEW Firebase");
     let gpBucketFilter = null;
     let chartFilter = { type: null, value: null };
     let compChartFilter = { type: null, value: null };
+    let compChartFilters = [];
     let pendingSalesEntry = null;
     let pendingSalesReopen = null;
     let salesCostDetails = {};
@@ -3581,16 +3582,15 @@ function showPage(page) {
       if (statusFilter) filtered = filtered.filter(c => c.status === statusFilter);
       if (yardFilter) filtered = filtered.filter(c => c.yard === yardFilter);
 
-      // Chart click filter
-      if (compChartFilter.type && compChartFilter.value) {
-        if (compChartFilter.type === 'train') filtered = filtered.filter(c => c.trainName === compChartFilter.value);
-        if (compChartFilter.type === 'status') filtered = filtered.filter(c => c.status === compChartFilter.value);
-        if (compChartFilter.type === 'source') filtered = filtered.filter(c => c.source === compChartFilter.value);
-        if (compChartFilter.type === 'mobile') filtered = filtered.filter(c => normalizeMobileNo(c.mobileNo) === normalizeMobileNo(compChartFilter.value));
-        if (compChartFilter.type === 'date') filtered = filtered.filter(c => c.date === compChartFilter.value);
-        if (compChartFilter.type === 'nature') filtered = filtered.filter(c => (c.complainNature || c.complaintType || 'Unknown') === compChartFilter.value);
-        if (compChartFilter.type === 'rakeManager') filtered = filtered.filter(c => getRakeManagerFromComplaint(c) === compChartFilter.value);
-      }
+      getActiveComplaintChartFilters().forEach(filter => {
+        if (filter.type === 'train') filtered = filtered.filter(c => c.trainName === filter.value);
+        if (filter.type === 'status') filtered = filtered.filter(c => c.status === filter.value);
+        if (filter.type === 'source') filtered = filtered.filter(c => c.source === filter.value);
+        if (filter.type === 'mobile') filtered = filtered.filter(c => normalizeMobileNo(c.mobileNo) === normalizeMobileNo(filter.value));
+        if (filter.type === 'date') filtered = filtered.filter(c => c.date === filter.value);
+        if (filter.type === 'nature') filtered = filtered.filter(c => (c.complainNature || c.complaintType || 'Unknown') === filter.value);
+        if (filter.type === 'rakeManager') filtered = filtered.filter(c => getRakeManagerFromComplaint(c) === filter.value);
+      });
 
       if (currentUser.yard !== 'ALL') {
         filtered = filtered.filter(c => c.yard === currentUser.yard);
@@ -3664,21 +3664,31 @@ function showPage(page) {
       document.getElementById('compDashStatusFilter').value = '';
       document.getElementById('compDashYardFilter').value = '';
       compChartFilter = { type: null, value: null };
+      compChartFilters = [];
       handleComplaintDateModeChange();
     }
 
     function clearCompChartFilter() {
       compChartFilter = { type: null, value: null };
+      compChartFilters = [];
       loadComplaintDashboard();
+    }
+
+    function getActiveComplaintChartFilters() {
+      if (Array.isArray(compChartFilters) && compChartFilters.length) return compChartFilters;
+      return compChartFilter.type && compChartFilter.value ? [compChartFilter] : [];
     }
 
     function toggleComplaintChartFilter(type, value) {
       const decoded = decodeURIComponent(value);
-      if (compChartFilter.type === type && compChartFilter.value === decoded) {
-        compChartFilter = { type: null, value: null };
+      const existingIndex = compChartFilters.findIndex(f => f.type === type && f.value === decoded);
+      if (existingIndex >= 0) {
+        compChartFilters.splice(existingIndex, 1);
       } else {
-        compChartFilter = { type, value: decoded };
+        compChartFilters = compChartFilters.filter(f => f.type !== type);
+        compChartFilters.push({ type, value: decoded });
       }
+      compChartFilter = compChartFilters.length ? compChartFilters[compChartFilters.length - 1] : { type: null, value: null };
       loadComplaintDashboard();
     }
 
@@ -4732,9 +4742,10 @@ function showPage(page) {
     function updateCompChartFilterDisplay() {
       const display = document.getElementById('compChartFilterDisplay');
       const text = document.getElementById('compChartFilterText');
-      if (compChartFilter.type && compChartFilter.value) {
+      const filters = getActiveComplaintChartFilters();
+      if (filters.length) {
         display.style.display = 'block';
-        text.textContent = `Filtered by ${compChartFilter.type}: ${compChartFilter.value}`;
+        text.textContent = filters.map(f => `${f.type}: ${f.value}`).join(' + ');
       } else {
         display.style.display = 'none';
       }
@@ -4755,8 +4766,10 @@ function showPage(page) {
             meta.data.forEach((bar, index) => {
               const value = Number(dataset.data[index]) || 0;
               if (!value) return;
-              ctx.fillStyle = dataset.backgroundColor || dataset.borderColor || '#1e293b';
-              ctx.fillText(String(value), bar.x, bar.y - 6);
+              const topY = bar.y - 6;
+              const drawInside = topY < chart.chartArea.top + 10;
+              ctx.fillStyle = drawInside ? '#fff' : (dataset.backgroundColor || dataset.borderColor || '#1e293b');
+              ctx.fillText(String(value), bar.x, drawInside ? bar.y + 16 : topY);
             });
           });
           ctx.restore();
@@ -4851,10 +4864,11 @@ function showPage(page) {
           },
           plugins: { legend: { labels: { color: '#64748b', font: { size: 10 } } } },
           scales: {
-            y: { beginAtZero: true, grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
+            y: { beginAtZero: true, grace: '12%', grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
             x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
           }
-        }
+        },
+        plugins: [makeBarValueLabelsPlugin('complaintTrainValueLabels')]
       });
     }
 
