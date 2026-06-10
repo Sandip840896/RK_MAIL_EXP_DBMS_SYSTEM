@@ -3007,6 +3007,78 @@ console.log("✅ Connected to NEW Firebase");
       setDefaultDates();
     }
 
+    function openLocalDb() {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) { reject(new Error('IndexedDB unavailable')); return; }
+        const request = indexedDB.open('rkGroupLocalDb', 1);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function saveLargeLocalData(key, value) {
+      const db = await openLocalDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('kv', 'readwrite');
+        tx.objectStore('kv').put(value, key);
+        tx.oncomplete = () => { db.close(); resolve(true); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      });
+    }
+
+    async function getLargeLocalData(key) {
+      try {
+        const db = await openLocalDb();
+        return await new Promise((resolve, reject) => {
+          const tx = db.transaction('kv', 'readonly');
+          const req = tx.objectStore('kv').get(key);
+          req.onsuccess = () => resolve(req.result || '');
+          req.onerror = () => reject(req.error);
+          tx.oncomplete = () => db.close();
+        });
+      } catch (error) {
+        console.warn('Could not read IndexedDB cache.', error);
+        return '';
+      }
+    }
+
+    function saveLocalAppData(data) {
+      const serialized = JSON.stringify(data || {});
+      try {
+        localStorage.setItem('rkGroupData', serialized);
+        localStorage.removeItem('rkGroupDataStorageMode');
+      } catch (error) {
+        if (error?.name === 'QuotaExceededError' || String(error?.message || '').toLowerCase().includes('quota')) {
+          localStorage.removeItem('rkGroupData');
+          localStorage.setItem('rkGroupDataStorageMode', 'indexeddb');
+          saveLargeLocalData('rkGroupData', serialized).catch(err => console.warn('IndexedDB local save failed.', err));
+          console.warn('LocalStorage quota exceeded. Data cached in IndexedDB fallback.');
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    async function getLocalAppData() {
+      const saved = localStorage.getItem('rkGroupData') || '';
+      if (saved) {
+        try { return JSON.parse(saved); }
+        catch (error) { console.warn('Could not parse localStorage app data.', error); }
+      }
+      if (localStorage.getItem('rkGroupDataStorageMode') === 'indexeddb') {
+        const largeSaved = await getLargeLocalData('rkGroupData');
+        if (largeSaved) {
+          try { return JSON.parse(largeSaved); }
+          catch (error) { console.warn('Could not parse IndexedDB app data.', error); }
+        }
+      }
+      return null;
+    }
+
     async function loadData() {
       if (firebaseInitialized) {
         try {
@@ -3014,10 +3086,9 @@ console.log("✅ Connected to NEW Firebase");
           const cloudData = snapshot.val();
           if (cloudData) {
             appData = decodeCloudData(cloudData);
-            const saved = localStorage.getItem('rkGroupData');
-            if (saved) {
+            const localData = await getLocalAppData();
+            if (localData) {
               try {
-                const localData = JSON.parse(saved);
                 const decodedCloudData = decodeCloudData(cloudData);
                 if ((localData.users || []).length > (decodedCloudData.users || []).length) {
                   appData.users = mergeUsers(decodedCloudData.users || [], localData.users || []);
@@ -3027,7 +3098,7 @@ console.log("✅ Connected to NEW Firebase");
               }
             }
             normalizeAppData();
-            localStorage.setItem('rkGroupData', JSON.stringify(appData));
+            saveLocalAppData(appData);
             autoSyncToCloud();
             return;
           }
@@ -3036,9 +3107,9 @@ console.log("✅ Connected to NEW Firebase");
         }
       }
 
-      const saved = localStorage.getItem('rkGroupData');
-      if (saved) {
-        appData = JSON.parse(saved);
+      const savedData = await getLocalAppData();
+      if (savedData) {
+        appData = savedData;
         normalizeAppData();
       } else {
         appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
@@ -3073,7 +3144,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!appData.users) appData.users = DEFAULT_DATA.users;
       hydrateManagerHierarchyFromMasters();
       ensureSystemUsers();
-      localStorage.setItem('rkGroupData', JSON.stringify(appData));
+      saveLocalAppData(appData);
     }
 
     function hydrateManagerHierarchyFromMasters() {
@@ -3166,7 +3237,7 @@ console.log("✅ Connected to NEW Firebase");
     }
 
     function saveData(options = {}) {
-      localStorage.setItem('rkGroupData', JSON.stringify(appData));
+      saveLocalAppData(appData);
       autoSyncToCloud(options); // Auto-sync to cloud if Firebase is configured
     }
 
@@ -9131,7 +9202,7 @@ function showPage(page) {
         
         await firebaseDb.ref('rkGroupData').set(encodeCloudData(dataToSync));
         appData = dataToSync;
-        localStorage.setItem('rkGroupData', JSON.stringify(appData));
+        saveLocalAppData(appData);
         if (!silent) showAlert('Data synced to cloud successfully!', 'success');
         console.log('Data synced to Firebase at:', dataToSync.lastSync);
       } catch (error) {
