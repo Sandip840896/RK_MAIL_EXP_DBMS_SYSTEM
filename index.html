@@ -529,6 +529,9 @@
                 <button class="btn btn-ghost btn-sm" onclick="downloadSalesDashboardExcel()">
                   <i class="fas fa-file-excel"></i>
                 </button>
+                <button class="btn btn-ghost btn-sm" onclick="downloadSalesDashboardPdf()">
+                  <i class="fas fa-file-pdf"></i>
+                </button>
               </div>
             </div>
 
@@ -939,6 +942,9 @@
                 </button>
                 <button class="btn btn-ghost btn-sm" onclick="downloadComplaintDashboardExcel()">
                   <i class="fas fa-file-excel"></i>
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="downloadComplaintDashboardPdf()">
+                  <i class="fas fa-file-pdf"></i>
                 </button>
               </div>
             </div>
@@ -8762,6 +8768,168 @@ function showPage(page) {
     function downloadMasterData() { downloadExcel(appData.trainMasters, 'train_master_export.xlsx'); }
     function downloadSalesDashboardExcel() { downloadExcel(getFilteredSales(1), `sales_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); }
     function downloadComplaintDashboardExcel() { downloadExcel(getFilteredComplaints(1), `complaint_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); }
+    function getPdfLib() {
+      return window.jspdf?.jsPDF || window.jsPDF;
+    }
+
+    function pdfMoney(value) {
+      return 'Rs. ' + Math.round(Number(value) || 0).toLocaleString('en-IN');
+    }
+
+    function addPdfHeader(doc, title, filters) {
+      doc.setFontSize(15);
+      doc.text(title, 14, 14);
+      doc.setFontSize(8);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 20);
+      doc.text(`User: ${currentUser?.name || currentUser?.email || '-'}`, 14, 25);
+      if (filters?.length) {
+        doc.autoTable({
+          startY: 30,
+          head: [['Selected Filters', 'Value']],
+          body: filters,
+          theme: 'grid',
+          styles: { fontSize: 7, cellPadding: 1.5 },
+          headStyles: { fillColor: [14, 165, 233] },
+          margin: { left: 14, right: 14 }
+        });
+      }
+    }
+
+    function getSalesDashboardFilterRows() {
+      const mode = getSalesDateMode();
+      const rows = [['Mode', mode === 'single' ? 'Single Period' : 'Comparison']];
+      if (mode === 'single') {
+        rows.push(['From Date', document.getElementById('dashSingleFromDate')?.value || '-']);
+        rows.push(['To Date', document.getElementById('dashSingleToDate')?.value || document.getElementById('dashSingleFromDate')?.value || '-']);
+      } else {
+        rows.push(['P1 Date', `${document.getElementById('dashFromDate1')?.value || '-'} to ${document.getElementById('dashToDate1')?.value || '-'}`]);
+        rows.push(['P2 Date', `${document.getElementById('dashFromDate2')?.value || '-'} to ${document.getElementById('dashToDate2')?.value || '-'}`]);
+      }
+      rows.push(['Train', document.getElementById('dashTrainFilter')?.value || 'All']);
+      rows.push(['Manager', document.getElementById('dashManagerFilter')?.value || 'All']);
+      rows.push(['Yard', document.getElementById('dashYardFilter')?.value || 'All']);
+      if (chartFilter.type && chartFilter.value) rows.push(['Chart Filter', `${chartFilter.type}: ${chartFilter.value}`]);
+      if (salesBucketFilter) rows.push(['Sales Bucket', salesBucketFilter]);
+      if (gpBucketFilter) rows.push(['GP Bucket', gpBucketFilter]);
+      return rows;
+    }
+
+    function getComplaintDashboardFilterRows() {
+      const mode = getComplaintDateMode();
+      const rows = [['Mode', mode === 'single' ? 'Single Period' : 'Comparison']];
+      if (mode === 'single') {
+        rows.push(['From Date', document.getElementById('compSingleFromDate')?.value || '-']);
+        rows.push(['To Date', document.getElementById('compSingleToDate')?.value || document.getElementById('compSingleFromDate')?.value || '-']);
+      } else {
+        rows.push(['P1 Date', `${document.getElementById('compFromDate1')?.value || '-'} to ${document.getElementById('compToDate1')?.value || '-'}`]);
+        rows.push(['P2 Date', `${document.getElementById('compFromDate2')?.value || '-'} to ${document.getElementById('compToDate2')?.value || '-'}`]);
+      }
+      rows.push(['Train', document.getElementById('compDashTrainFilter')?.value || 'All']);
+      rows.push(['Status', document.getElementById('compDashStatusFilter')?.value || 'All']);
+      rows.push(['Yard', document.getElementById('compDashYardFilter')?.value || 'All']);
+      const chartFilters = getActiveComplaintChartFilters();
+      if (chartFilters.length) rows.push(['Chart Filters', chartFilters.map(f => `${f.type}: ${f.value}`).join(' + ')]);
+      return rows;
+    }
+
+    function addPdfSectionTitle(doc, title, y) {
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text(title, 14, y);
+      return y + 3;
+    }
+
+    function downloadSalesDashboardPdf() {
+      const JsPDF = getPdfLib();
+      if (!JsPDF || !window.jspdf || !document.createElement('table').closest) { showAlert('PDF library not loaded. Please refresh and try again.', 'error'); return; }
+      const mode = getSalesDateMode();
+      const p1 = getFilteredSales(1);
+      const p2 = mode === 'comparison' ? getFilteredSales(2) : [];
+      if (!p1.length && !p2.length) { showAlert('No sales dashboard data found for selected filters.', 'warning'); return; }
+      const doc = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      addPdfHeader(doc, 'RK Group - Sales Dashboard Detail Report', getSalesDashboardFilterRows());
+      let y = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : 38;
+      const summarize = rows => ({
+        entries: rows.length,
+        sale: rows.reduce((s, r) => s + (Number(r.salesAchievement || r.totalSale) || 0), 0),
+        gp: rows.reduce((s, r) => s + (Number(r.gpAchievement) || 0), 0),
+        target: rows.reduce((s, r) => s + (Number(r.salesTarget) || 0), 0),
+        gpTarget: rows.reduce((s, r) => s + (Number(r.gpTarget) || 0), 0)
+      });
+      const s1 = summarize(p1), s2 = summarize(p2);
+      y = addPdfSectionTitle(doc, 'Summary', y);
+      doc.autoTable({
+        startY: y,
+        head: [['Period', 'Entries', 'Sales Target', 'Total Sale', 'GP Target', 'Total GP']],
+        body: [
+          ['Period 1', s1.entries, pdfMoney(s1.target), pdfMoney(s1.sale), pdfMoney(s1.gpTarget), pdfMoney(s1.gp)],
+          ...(mode === 'comparison' ? [['Period 2', s2.entries, pdfMoney(s2.target), pdfMoney(s2.sale), pdfMoney(s2.gpTarget), pdfMoney(s2.gp)]] : [])
+        ],
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        headStyles: { fillColor: [14, 165, 233] },
+        margin: { left: 14, right: 14 }
+      });
+      y = doc.lastAutoTable.finalY + 8;
+      const addSalesRows = (title, rows) => {
+        if (!rows.length) return;
+        y = addPdfSectionTitle(doc, title, y);
+        doc.autoTable({
+          startY: y,
+          head: [['Date', 'Train', 'No', 'Yard', 'Train Manager', 'Rake Manager', 'Target', 'Sale', 'GP', 'Salary']],
+          body: rows.map(r => [formatDate(r.date), r.trainName || '-', r.trainNumber || '-', r.yard || '-', r.trainManager || '-', r.rakeManager || '-', pdfMoney(r.salesTarget), pdfMoney(r.salesAchievement || r.totalSale), pdfMoney(r.gpAchievement), pdfMoney(r.managerSalary)]),
+          styles: { fontSize: 6.5, cellPadding: 1.2, overflow: 'linebreak' },
+          headStyles: { fillColor: [2, 132, 199] },
+          margin: { left: 14, right: 14 }
+        });
+        y = doc.lastAutoTable.finalY + 8;
+      };
+      addSalesRows('Sales Detail - Period 1', p1);
+      addSalesRows('Sales Detail - Period 2', p2);
+      doc.save(`sales_dashboard_detail_${new Date().toISOString().split('T')[0]}.pdf`);
+    }
+
+    function downloadComplaintDashboardPdf() {
+      const JsPDF = getPdfLib();
+      if (!JsPDF) { showAlert('PDF library not loaded. Please refresh and try again.', 'error'); return; }
+      const mode = getComplaintDateMode();
+      const p1 = getFilteredComplaints(1);
+      const p2 = mode === 'comparison' ? getFilteredComplaints(2) : [];
+      if (!p1.length && !p2.length) { showAlert('No complaint dashboard data found for selected filters.', 'warning'); return; }
+      const doc = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      addPdfHeader(doc, 'RK Group - Complaint Dashboard Detail Report', getComplaintDashboardFilterRows());
+      let y = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : 38;
+      const countStatus = (rows, status) => rows.filter(r => r.status === status).length;
+      y = addPdfSectionTitle(doc, 'Summary', y);
+      doc.autoTable({
+        startY: y,
+        head: [['Period', 'Total', 'Open', 'In Progress', 'Closed']],
+        body: [
+          ['Period 1', p1.length, countStatus(p1, 'Open'), countStatus(p1, 'In Progress'), countStatus(p1, 'Closed')],
+          ...(mode === 'comparison' ? [['Period 2', p2.length, countStatus(p2, 'Open'), countStatus(p2, 'In Progress'), countStatus(p2, 'Closed')]] : [])
+        ],
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        headStyles: { fillColor: [239, 68, 68] },
+        margin: { left: 14, right: 14 }
+      });
+      y = doc.lastAutoTable.finalY + 8;
+      const addComplaintRows = (title, rows) => {
+        if (!rows.length) return;
+        y = addPdfSectionTitle(doc, title, y);
+        doc.autoTable({
+          startY: y,
+          head: [['Date', 'Train', 'No', 'Yard', 'Rake Manager', 'Phone', 'Customer', 'Nature', 'Status', 'Reference']],
+          body: rows.map(c => [formatDate(c.date), c.trainName || '-', c.trainNo || c.trainNumber || '-', c.yard || '-', getRakeManagerFromComplaint(c), c.rakeManagerPhone || c.rakeManagerContact || '-', c.mobileNo || c.mobile || '-', c.complainNature || c.complaintType || '-', c.status || '-', c.referenceNo || c.complaintId || '-']),
+          styles: { fontSize: 6.3, cellPadding: 1.1, overflow: 'linebreak' },
+          headStyles: { fillColor: [220, 38, 38] },
+          margin: { left: 14, right: 14 }
+        });
+        y = doc.lastAutoTable.finalY + 8;
+      };
+      addComplaintRows('Complaint Detail - Period 1', p1);
+      addComplaintRows('Complaint Detail - Period 2', p2);
+      doc.save(`complaint_dashboard_detail_${new Date().toISOString().split('T')[0]}.pdf`);
+    }
+
     function downloadCashDashboardExcel() { 
       const fromDate = document.getElementById('cashDashFromDate')?.value;
       const toDate = document.getElementById('cashDashToDate')?.value;
@@ -9186,6 +9354,8 @@ function showPage(page) {
     window.downloadCashEntries = downloadCashEntries;
     window.downloadSalesDashboardExcel = downloadSalesDashboardExcel;
     window.downloadComplaintDashboardExcel = downloadComplaintDashboardExcel;
+    window.downloadSalesDashboardPdf = downloadSalesDashboardPdf;
+    window.downloadComplaintDashboardPdf = downloadComplaintDashboardPdf;
     window.downloadCashDashboardExcel = downloadCashDashboardExcel;
     window.downloadTableExcel = downloadTableExcel;
     window.downloadBackup = downloadBackup;
