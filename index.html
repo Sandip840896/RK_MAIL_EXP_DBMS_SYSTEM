@@ -8839,6 +8839,53 @@ function showPage(page) {
       return y + 3;
     }
 
+    function getCanvasImageData(canvasId) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas || !canvas.width || !canvas.height) return '';
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = canvas.width;
+      exportCanvas.height = canvas.height;
+      const ctx = exportCanvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+      ctx.drawImage(canvas, 0, 0);
+      return exportCanvas.toDataURL('image/png', 1.0);
+    }
+
+    function addChartImagesToPdf(doc, chartsToAdd, startY) {
+      let y = startY;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 14;
+      const gap = 8;
+      const chartWidth = (pageWidth - (margin * 2) - gap) / 2;
+      const chartHeight = 58;
+      let column = 0;
+
+      y = addPdfSectionTitle(doc, 'Dashboard Charts', y);
+      chartsToAdd.forEach(chartInfo => {
+        const imageData = getCanvasImageData(chartInfo.id);
+        if (!imageData) return;
+        if (y + chartHeight + 10 > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+          column = 0;
+        }
+        const x = margin + (column * (chartWidth + gap));
+        doc.setFontSize(8);
+        doc.setTextColor(15, 23, 42);
+        doc.text(chartInfo.title, x, y + 3);
+        doc.addImage(imageData, 'PNG', x, y + 6, chartWidth, chartHeight, undefined, 'FAST');
+        column += 1;
+        if (column >= 2) {
+          column = 0;
+          y += chartHeight + 14;
+        }
+      });
+      if (column !== 0) y += chartHeight + 14;
+      return y + 2;
+    }
+
     function downloadSalesDashboardPdf() {
       const JsPDF = getPdfLib();
       if (!JsPDF || !window.jspdf || !document.createElement('table').closest) { showAlert('PDF library not loaded. Please refresh and try again.', 'error'); return; }
@@ -8870,8 +8917,20 @@ function showPage(page) {
         margin: { left: 14, right: 14 }
       });
       y = doc.lastAutoTable.finalY + 8;
+      y = addChartImagesToPdf(doc, [
+        { id: 'salesTrendChart', title: 'Sales Trend (Daily)' },
+        { id: 'yardSalesChart', title: 'Yard-wise Sales' },
+        { id: 'topTrainsChart', title: 'Top 10 Trains' },
+        { id: 'bottomTrainsChart', title: 'Bottom 10 Trains' },
+        { id: 'managerChart', title: 'Manager Performance' },
+        { id: 'trainTypeChart', title: 'Train Type Performance' }
+      ], y);
       const addSalesRows = (title, rows) => {
         if (!rows.length) return;
+        if (y > 170) {
+          doc.addPage();
+          y = 14;
+        }
         y = addPdfSectionTitle(doc, title, y);
         doc.autoTable({
           startY: y,
@@ -8912,8 +8971,20 @@ function showPage(page) {
         margin: { left: 14, right: 14 }
       });
       y = doc.lastAutoTable.finalY + 8;
+      y = addChartImagesToPdf(doc, [
+        { id: 'complaintTrendChart', title: 'Daily Complaint Trend (P1 vs P2)' },
+        { id: 'complaintTrainChart', title: 'Train-wise Comparison' },
+        { id: 'natureAnalysisChart', title: 'Nature-wise Complaint Analysis' },
+        { id: 'managerComplaintChart', title: 'Rake Manager-wise Complaint Contribution' },
+        { id: 'complaintYardChart', title: 'Yard-wise Complaint Contribution' },
+        { id: 'complaintSourceChart', title: 'Complaint Source Mix' }
+      ], y);
       const addComplaintRows = (title, rows) => {
         if (!rows.length) return;
+        if (y > 170) {
+          doc.addPage();
+          y = 14;
+        }
         y = addPdfSectionTitle(doc, title, y);
         doc.autoTable({
           startY: y,
