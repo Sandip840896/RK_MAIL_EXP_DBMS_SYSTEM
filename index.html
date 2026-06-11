@@ -5807,8 +5807,8 @@ function showPage(page) {
       let cashData = [...(appData.cash || [])];
       let salesData = [...(appData.sales || [])];
 
-      if (fromDate) { cashData = cashData.filter(c => c.date >= fromDate); salesData = salesData.filter(s => s.date >= fromDate); }
-      if (toDate) { cashData = cashData.filter(c => c.date <= toDate); salesData = salesData.filter(s => s.date <= toDate); }
+      if (fromDate) { cashData = cashData.filter(c => getCashDashboardDate(c) >= fromDate); salesData = salesData.filter(s => getCashDashboardDate(s) >= fromDate); }
+      if (toDate) { cashData = cashData.filter(c => getCashDashboardDate(c) <= toDate); salesData = salesData.filter(s => getCashDashboardDate(s) <= toDate); }
       if (yardFilter) { cashData = cashData.filter(c => c.yard === yardFilter); salesData = salesData.filter(s => s.yard === yardFilter); }
       if (managerFilter) { cashData = cashData.filter(c => { const train = appData.trainMasters.find(t => t.trainName === c.trainName); return train && train.trainManager === managerFilter; }); salesData = salesData.filter(s => s.trainManager === managerFilter); }
 
@@ -5856,6 +5856,10 @@ function showPage(page) {
       }
     }
 
+    function getCashDashboardDate(entry) {
+      return getComparableDate(entry?.arrivalDate || entry?.date || entry?.entryDate || '');
+    }
+
     function getSaleCollectableAmount(sale) {
       return Number(sale?.amountToCollect || sale?.salesAchievement || sale?.totalSale) || 0;
     }
@@ -5869,10 +5873,10 @@ function showPage(page) {
     function renderCashCollectionTable(cashData, salesData) {
       const tbody = document.getElementById('cashCollectionTableBody');
       if (!tbody) return;
-      const dates = [...new Set([...(salesData || []).map(s => getComparableDate(s.date)), ...(cashData || []).map(c => getComparableDate(c.date))].filter(Boolean))].sort();
+      const dates = [...new Set([...(salesData || []).map(getCashDashboardDate), ...(cashData || []).map(getCashDashboardDate)].filter(Boolean))].sort();
       const rows = dates.map(date => {
-        const daySales = (salesData || []).filter(s => getComparableDate(s.date) === date);
-        const dayCash = (cashData || []).filter(c => getComparableDate(c.date) === date);
+        const daySales = (salesData || []).filter(s => getCashDashboardDate(s) === date);
+        const dayCash = (cashData || []).filter(c => getCashDashboardDate(c) === date);
         const amountToCollect = daySales.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
         const cashDeposit = dayCash.reduce((sum, c) => sum + (Number(c.cashDepositCounter) || 0), 0);
         const onlineDeposit = dayCash.reduce((sum, c) => sum + (Number(c.onlineDeposit) || 0), 0);
@@ -5990,7 +5994,7 @@ function showPage(page) {
       const tbody = document.getElementById('pendingDepositTableBody');
       if (!tbody) return;
       const rows = salesData.map(s => {
-        const matchingDeposits = cashData.filter(c => getComparableDate(c.date) === getComparableDate(s.date) && isSameTrainForCashSale(c, s));
+        const matchingDeposits = cashData.filter(c => getCashDashboardDate(c) === getCashDashboardDate(s) && isSameTrainForCashSale(c, s));
         const deposited = matchingDeposits.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
         const totalSale = getSaleCollectableAmount(s);
         const latestCash = matchingDeposits.sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0];
@@ -6000,7 +6004,7 @@ function showPage(page) {
           trainName: s.trainName || latestCash?.trainName || '-',
           trainNumber: normalizeTrainNo(s.trainNumber || latestCash?.trainNumber) || s.trainNumber || latestCash?.trainNumber || '-',
           rakeNumber: latestCash?.rakeNumber || s.rakeNumber || '-',
-          date: s.date || '',
+          date: getCashDashboardDate(s) || s.date || '',
           totalSale,
           deposited,
           pending: totalSale - deposited
@@ -6026,7 +6030,7 @@ function showPage(page) {
       const selectedRake = normalizeText(rakeNumber);
       const selectedManager = normalizeText(rakeManager);
       return (appData.sales || []).find(s => {
-        if (getComparableDate(s.date) !== day) return false;
+        if (getCashDashboardDate(s) !== day) return false;
         const sameMaster = trainId && s.trainId && String(s.trainId) === String(trainId);
         const sameTrain = buildTrainKey(s.trainNumber, s.trainName) === buildTrainKey(trainNumber, trainName);
         if (!sameMaster && !sameTrain) return false;
@@ -9168,6 +9172,8 @@ function showPage(page) {
         { id: 'complaintYardChart', title: 'Yard-wise Complaint Contribution' },
         { id: 'complaintSourceChart', title: 'Complaint Source Mix' }
       ], y);
+      y = addHtmlTableToPdf(doc, 'topTrainsTable', 'Rake Manager-wise Complaint Ranking', y);
+      y = addHtmlTableToPdf(doc, 'repeatComplaintTable', 'Repeat Complaint Mobile Numbers', y);
       const addComplaintRows = (title, rows) => {
         if (!rows.length) return;
         if (y > 170) {
@@ -9194,8 +9200,8 @@ function showPage(page) {
       const fromDate = document.getElementById('cashDashFromDate')?.value;
       const toDate = document.getElementById('cashDashToDate')?.value;
       let cashData = [...(appData.cash || [])];
-      if (fromDate) cashData = cashData.filter(c => c.date >= fromDate);
-      if (toDate) cashData = cashData.filter(c => c.date <= toDate);
+      if (fromDate) cashData = cashData.filter(c => getCashDashboardDate(c) >= fromDate);
+      if (toDate) cashData = cashData.filter(c => getCashDashboardDate(c) <= toDate);
       downloadExcel(cashData, `cash_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); 
     }
 
