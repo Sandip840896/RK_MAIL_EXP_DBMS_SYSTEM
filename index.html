@@ -711,6 +711,12 @@
                 <canvas id="salesTrendChart"></canvas>
               </div>
             </div>
+            <div class="card" id="gpTrendCard">
+              <h3 class="card-title">GP Trend (Daily) <small style="font-size: 10px; color: #64748b;">- Click bar to filter</small></h3>
+              <div class="chart-container">
+                <canvas id="gpTrendChart"></canvas>
+              </div>
+            </div>
             <div class="card" id="yardSalesCard">
               <h3 class="card-title">Yard-wise Sales <small style="font-size: 10px; color: #64748b;">- Click bar to filter</small></h3>
               <div class="chart-container">
@@ -1662,6 +1668,7 @@
                     <option>Misbehavior</option>
                     <option>misc</option>
                     <option>Not Available</option>
+                    <option>Water Not Available</option>
                     <option>No Bill provided</option>
                     <option>Others</option>
                     <option>Overcharging</option>
@@ -2610,6 +2617,17 @@
           <div class="card">
             <h3 class="card-title"><i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i> Danger Zone</h3>
             <p class="card-subtitle">These actions cannot be undone. Use with caution!</p>
+            <div class="grid grid-2" style="margin-top: 14px; padding: 12px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px;">
+              <div class="form-field">
+                <label>Delete From Date</label>
+                <input type="date" id="dangerDeleteFromDate">
+              </div>
+              <div class="form-field">
+                <label>Delete To Date</label>
+                <input type="date" id="dangerDeleteToDate">
+              </div>
+              <p class="card-subtitle" style="grid-column: 1 / -1; margin: 0;">If date range is blank, Delete All will remove all records for that section.</p>
+            </div>
             <div class="grid grid-4" style="margin-top: 16px;">
               <div style="padding: 14px; background: #fef2f2; border-radius: 10px; border: 1px solid #fca5a5;">
                 <h4 style="color: #dc2626; margin: 0 0 10px 0; font-size: 13px;">Reset Sales Data</h4>
@@ -2917,6 +2935,7 @@ console.log("✅ Connected to NEW Firebase");
       'Misbehavior': 'Staff Behavior',
       'misc': 'Other',
       'Not Available': 'Availability',
+      'Water Not Available': 'Availability',
       'No Bill provided': 'Billing',
       'Others': 'Other',
       'Overcharging': 'Billing',
@@ -3258,33 +3277,68 @@ console.log("✅ Connected to NEW Firebase");
       return true;
     }
 
-    function deleteAllSalesData() {
-      if (!ensureEditable('delete sales data') || !requireMasterDeleteKey('delete all sales data')) return;
-      if (!confirm('Delete ALL sales data? This cannot be undone!')) return;
-      appData.sales = [];
+    function ensureSuperAdminDangerAction() {
+      if ((currentUser?.role || '').toLowerCase() !== 'super_admin') {
+        showAlert('Only Super Admin can use Danger Zone delete actions.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    function getDangerDeleteRange() {
+      const from = document.getElementById('dangerDeleteFromDate')?.value || '';
+      const to = document.getElementById('dangerDeleteToDate')?.value || '';
+      return { from, to, active: Boolean(from || to) };
+    }
+
+    function getRecordOperationDate(record) {
+      return record?.date || record?.arrivalDate || record?.entryDate || record?.complaintDate || '';
+    }
+
+    function isRecordInDangerRange(record, range) {
+      if (!range.active) return true;
+      const date = getRecordOperationDate(record);
+      if (!date) return false;
+      if (range.from && date < range.from) return false;
+      if (range.to && date > range.to) return false;
+      return true;
+    }
+
+    function deleteRecordsByDangerRange(collectionName, label, reloadFns = []) {
+      if (!ensureEditable(`delete ${label}`) || !ensureSuperAdminDangerAction()) return;
+      const range = getDangerDeleteRange();
+      const rangeText = range.active ? `${range.from || 'first date'} to ${range.to || 'last date'}` : 'ALL dates';
+      if (!requireMasterDeleteKey(`delete ${label} for ${rangeText}`)) return;
+      if (!confirm(`Delete ${label} for ${rangeText}? This cannot be undone!`)) return;
+      const rows = appData[collectionName] || [];
+      const keep = [];
+      let deletedCount = 0;
+      rows.forEach((row, index) => {
+        if (isRecordInDangerRange(row, range)) {
+          deletedCount++;
+          if (row?.id) markRecordDeleted(collectionName, row.id);
+          markRecordDeleted(collectionName, makeRecordKey(row, collectionName));
+          markRecordDeleted(collectionName, makeRecordKey(row, index));
+        } else {
+          keep.push(row);
+        }
+      });
+      appData[collectionName] = range.active ? keep : [];
       saveData({ forceOverwrite: true });
-      showAlert('All sales data deleted', 'success');
-      loadDashboard();
+      showAlert(`${deletedCount} ${label} deleted`, 'success');
+      reloadFns.forEach(fn => fn());
+    }
+
+    function deleteAllSalesData() {
+      deleteRecordsByDangerRange('sales', 'sales records', [loadDashboard]);
     }
 
     function deleteAllComplaintData() {
-      if (!ensureEditable('delete complaint data') || !requireMasterDeleteKey('delete all complaint data')) return;
-      if (!confirm('Delete ALL complaint data? This cannot be undone!')) return;
-      appData.complaints = [];
-      saveData({ forceOverwrite: true });
-      showAlert('All complaint data deleted', 'success');
-      loadDashboard();
-      loadComplaintDashboard();
+      deleteRecordsByDangerRange('complaints', 'complaint records', [loadDashboard, loadComplaintDashboard]);
     }
 
     function deleteAllCashData() {
-      if (!ensureEditable('delete cash data') || !requireMasterDeleteKey('delete all cash data')) return;
-      if (!confirm('Delete ALL cash deposit data? This cannot be undone!')) return;
-      appData.cash = [];
-      saveData({ forceOverwrite: true });
-      showAlert('All cash data deleted', 'success');
-      loadDashboard();
-      loadCashDashboard();
+      deleteRecordsByDangerRange('cash', 'cash deposit records', [loadDashboard, loadCashDashboard]);
     }
 
     function deleteAllTrainMasters() {
@@ -3865,6 +3919,7 @@ function showPage(page) {
 
       // Render charts
       renderSalesTrendChart(salesP1);
+      renderGpTrendChart(salesP1);
       renderYardSalesChart(salesP1);
       renderTopTrainsChart(salesP1);
       renderBottomTrainsChart(salesP1);
@@ -4008,7 +4063,50 @@ function showPage(page) {
             x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
           }
         },
-        plugins: [makeBarValueLabelsPlugin('complaintTrainValueLabels')]
+        plugins: [makeBarValueLabelsPlugin('salesTrendValueLabels')]
+      });
+    }
+
+    function renderGpTrendChart(sales) {
+      const ctx = document.getElementById('gpTrendChart');
+      if (!ctx) return;
+
+      const dateMap = {};
+      sales.forEach(s => {
+        const date = s.date || s.arrivalDate || '';
+        if (date) dateMap[date] = (dateMap[date] || 0) + (Number(s.gpAchievement) || 0);
+      });
+      const sortedDates = Object.keys(dateMap).sort();
+
+      if (charts.gpTrend) charts.gpTrend.destroy();
+      charts.gpTrend = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: sortedDates,
+          datasets: [{
+            label: 'GP Achievement',
+            data: sortedDates.map(d => dateMap[d]),
+            backgroundColor: '#22c55e',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: (e, elements) => {
+            if (elements.length > 0) {
+              const index = elements[0].index;
+              chartFilter = { type: 'date', value: sortedDates[index] };
+              loadDashboard();
+            }
+          },
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, grace: '12%', grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
+            x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } }
+          }
+        },
+        plugins: [makeBarValueLabelsPlugin('gpTrendValueLabels')]
       });
     }
 
@@ -4160,12 +4258,14 @@ function showPage(page) {
       sales.forEach(s => { if (s.trainManager) managerMap[s.trainManager] = (managerMap[s.trainManager] || 0) + (Number(s.gpAchievement) || 0); });
 
       const managers = Object.keys(managerMap);
+      const managerTotal = managers.reduce((sum, manager) => sum + managerMap[manager], 0);
+      const managerLabels = managers.map(manager => `${manager} (${managerTotal ? Math.round((managerMap[manager] / managerTotal) * 100) : 0}%)`);
 
       if (charts.manager) charts.manager.destroy();
       charts.manager = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: managers,
+          labels: managerLabels,
           datasets: [{
             data: managers.map(m => managerMap[m]),
             backgroundColor: ['#0ea5e9', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6', '#06b6d4']
@@ -4182,7 +4282,17 @@ function showPage(page) {
             }
           },
           plugins: {
-            legend: { position: 'bottom', labels: { color: '#64748b', font: { size: 10 } } }
+            legend: { position: 'bottom', labels: { color: '#64748b', font: { size: 10 } } },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const value = context.raw;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const pct = total ? Math.round((value / total) * 100) : 0;
+                  return `${managers[context.dataIndex] || context.label}: ${formatCurrency(value)} (${pct}%)`;
+                }
+              }
+            }
           }
         }
       });
@@ -4196,12 +4306,14 @@ function showPage(page) {
       sales.forEach(s => { const type = s.trainType || 'Unknown'; typeMap[type] = (typeMap[type] || 0) + (Number(s.salesAchievement) || 0); });
 
       const types = Object.keys(typeMap);
+      const typeTotal = types.reduce((sum, type) => sum + typeMap[type], 0);
+      const typeLabels = types.map(type => `${type} (${typeTotal ? Math.round((typeMap[type] / typeTotal) * 100) : 0}%)`);
 
       if (charts.trainType) charts.trainType.destroy();
       charts.trainType = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: types,
+          labels: typeLabels,
           datasets: [{
             data: types.map(t => typeMap[t]),
             backgroundColor: ['#0ea5e9', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6']
@@ -4225,7 +4337,7 @@ function showPage(page) {
                   const value = context.raw;
                   const total = context.dataset.data.reduce((a, b) => a + b, 0);
                   const pct = total ? Math.round((value / total) * 100) : 0;
-                  return `${context.label}: ${formatCurrency(value)} (${pct}%)`;
+                  return `${types[context.dataIndex] || context.label}: ${formatCurrency(value)} (${pct}%)`;
                 }
               }
             }
@@ -8631,37 +8743,45 @@ function showPage(page) {
       downloadExcel(data, 'cash_import_sample.xlsx');
     }
 
-    function downloadComplaintEntryReport() {
-      const rows = (appData.complaints || []).map(c => ({
+    function formatComplaintExportRow(c) {
+      return {
+        'Entry Date': c.entryDate || c.date || '',
+        'Arrival Date': c.arrivalDate || c.date || '',
         Date: c.date || '',
         Status: c.status || '',
         'Complaint ID': c.complaintId || '',
         'Reference No': c.referenceNo || '',
         Source: c.source || '',
-        Train: c.trainName || '',
-        'Train No': c.trainNo || c.trainNumber || '',
+        'Train Name': c.trainName || '',
+        'Train Number': c.trainNo || c.trainNumber || '',
         Yard: c.yard || '',
         'Train Manager': c.trainManager || '',
-        'Rake Manager': c.rakeManager || '',
+        'Train Manager Phone': c.trainManagerContact || c.trainManagerPhone || '',
+        'Rake Manager': getRakeManagerFromComplaint(c),
         'Rake Manager Phone': c.rakeManagerContact || c.rakeManagerPhone || '',
         'Rake Number': c.rakeNumber || '',
         'Complainant Details': c.complainantName || '',
         Email: c.email || '',
-        Mobile: c.mobileNo || '',
+        'Customer Mobile': c.mobileNo || c.mobile || '',
         'PNR / UTS': c.pnrNo || '',
         'Coach No': c.coachNo || '',
         'Physical Coach No': c.physicalCoachNo || '',
         'Berth No': c.berthNo || '',
         'Train Commencement Date Time': c.commencementDateTime || '',
-        Nature: c.complainNature || '',
+        'Complain Nature': c.complainNature || '',
+        'Complaint Type': c.complaintType || '',
         Description: c.details || '',
+        Remarks: c.remarks || '',
         'Action Taken 1': c.actionTaken1 || '',
         'Action Taken 2': c.actionTaken2 || '',
         'Action Taken 3': c.actionTaken3 || '',
         'Action Taken 4': c.actionTaken4 || '',
-        'Action Taken 5': c.actionTaken5 || '',
-        Remarks: c.remarks || ''
-      }));
+        'Action Taken 5': c.actionTaken5 || ''
+      };
+    }
+
+    function downloadComplaintEntryReport() {
+      const rows = (appData.complaints || []).map(formatComplaintExportRow);
       downloadExcel(rows, `complaint_entry_report_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
 
@@ -8780,36 +8900,7 @@ function showPage(page) {
     function downloadComplaintEntries() {
       const rows = getFilteredComplaintEntriesFromListFilters();
       if (!rows.length) { showAlert('No complaint entries found for selected filters.', 'warning'); return; }
-      const exportRows = rows.map(c => ({
-        'Entry Date': c.entryDate || c.date || '',
-        'Arrival Date': c.arrivalDate || c.date || '',
-        Date: c.date || '',
-        Status: c.status || '',
-        'Complaint ID': c.complaintId || '',
-        Source: c.source || '',
-        'Train Name': c.trainName || '',
-        'Train Number': c.trainNo || c.trainNumber || '',
-        Yard: c.yard || '',
-        'Train Manager': c.trainManager || '',
-        'Train Manager Phone': c.trainManagerContact || c.trainManagerPhone || '',
-        'Rake Manager': c.rakeManager || '',
-        'Rake Manager Phone': c.rakeManagerContact || c.rakeManagerPhone || '',
-        'Rake Number': c.rakeNumber || '',
-        'Customer Mobile': c.mobileNo || '',
-        'Reference No': c.referenceNo || '',
-        'PNR / UTS': c.pnrNo || '',
-        'Coach No': c.coachNo || '',
-        'Physical Coach No': c.physicalCoachNo || '',
-        'Berth No': c.berthNo || '',
-        'Complain Nature': c.complainNature || '',
-        Description: c.details || '',
-        'Action Taken 1': c.actionTaken1 || '',
-        'Action Taken 2': c.actionTaken2 || '',
-        'Action Taken 3': c.actionTaken3 || '',
-        'Action Taken 4': c.actionTaken4 || '',
-        'Action Taken 5': c.actionTaken5 || '',
-        Remarks: c.remarks || ''
-      }));
+      const exportRows = rows.map(formatComplaintExportRow);
       downloadExcel(exportRows, getListExportSuffix('complaint_entries', 'complaintFilterFrom', 'complaintFilterTo'));
     }
 
@@ -8838,7 +8929,7 @@ function showPage(page) {
 
     function downloadMasterData() { downloadExcel(appData.trainMasters, 'train_master_export.xlsx'); }
     function downloadSalesDashboardExcel() { downloadExcel(getFilteredSales(1), `sales_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); }
-    function downloadComplaintDashboardExcel() { downloadExcel(getFilteredComplaints(1), `complaint_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); }
+    function downloadComplaintDashboardExcel() { downloadExcel(getFilteredComplaints(1).map(formatComplaintExportRow), `complaint_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); }
     function getPdfLib() {
       return window.jspdf?.jsPDF || window.jsPDF;
     }
@@ -8957,6 +9048,26 @@ function showPage(page) {
       return y + 2;
     }
 
+    function addHtmlTableToPdf(doc, tableId, title, startY) {
+      const table = document.getElementById(tableId);
+      if (!table || !table.querySelector('tbody tr')) return startY;
+      let y = startY;
+      if (y > 170) {
+        doc.addPage();
+        y = 14;
+      }
+      y = addPdfSectionTitle(doc, title, y);
+      doc.autoTable({
+        html: table,
+        startY: y,
+        theme: 'grid',
+        styles: { fontSize: 5.8, cellPadding: 1, overflow: 'linebreak' },
+        headStyles: { fillColor: [14, 165, 233], fontSize: 5.8 },
+        margin: { left: 14, right: 14 }
+      });
+      return doc.lastAutoTable.finalY + 8;
+    }
+
     function downloadSalesDashboardPdf() {
       const JsPDF = getPdfLib();
       if (!JsPDF || !window.jspdf || !document.createElement('table').closest) { showAlert('PDF library not loaded. Please refresh and try again.', 'error'); return; }
@@ -8990,12 +9101,19 @@ function showPage(page) {
       y = doc.lastAutoTable.finalY + 8;
       y = addChartImagesToPdf(doc, [
         { id: 'salesTrendChart', title: 'Sales Trend (Daily)' },
+        { id: 'gpTrendChart', title: 'GP Trend (Daily)' },
         { id: 'yardSalesChart', title: 'Yard-wise Sales' },
         { id: 'topTrainsChart', title: 'Top 10 Trains' },
         { id: 'bottomTrainsChart', title: 'Bottom 10 Trains' },
         { id: 'managerChart', title: 'Manager Performance' },
         { id: 'trainTypeChart', title: 'Train Type Performance' }
       ], y);
+      y = addHtmlTableToPdf(doc, 'topTrainTable', 'Top 10 Train Performance', y);
+      y = addHtmlTableToPdf(doc, 'bottomTrainTable', 'Bottom 10 Train Performance', y);
+      y = addHtmlTableToPdf(doc, 'trainManagerRankTable', 'Top 10 Train Managers', y);
+      y = addHtmlTableToPdf(doc, 'rakeManagerRankTable', 'Top 10 Rake Managers', y);
+      y = addHtmlTableToPdf(doc, 'trainManagerSalesSummaryTable', 'Rake Manager Sales, GP and Salary Summary', y);
+      y = addHtmlTableToPdf(doc, 'rankTable', 'Train Rank Table', y);
       const addSalesRows = (title, rows) => {
         if (!rows.length) return;
         if (y > 170) {
