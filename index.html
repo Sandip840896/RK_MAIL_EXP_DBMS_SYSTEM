@@ -1482,7 +1482,8 @@
                 <table id="salesTable">
                   <thead>
                     <tr>
-                      <th>Date</th>
+                      <th>Arrival Date</th>
+                      <th>Departure Date</th>
                       <th>Train</th>
                       <th>Yard</th>
                       <th>Sales</th>
@@ -6268,9 +6269,9 @@ function showPage(page) {
       document.getElementById('salesAchievementPct').value = pct + '%';
     }
 
-    function findSalesEntryByDateTrain(date, trainNumber, trainName, trainId = '') {
+    function findSalesEntryByDateTrain(date, trainNumber, trainName, trainId = '', excludeId = null) {
       const day = getComparableDate(date);
-      return (appData.sales || []).find(s => getComparableDate(s.date) === day && (
+      return (appData.sales || []).find(s => s.id != excludeId && getSalesEntryArrivalDate(s) === day && (
         (trainId && s.trainId && String(s.trainId) === String(trainId)) ||
         buildTrainKey(s.trainNumber, s.trainName) === buildTrainKey(trainNumber, trainName)
       ));
@@ -6278,7 +6279,7 @@ function showPage(page) {
 
     function getCashEntriesForSalesEntry(sale) {
       if (!sale) return [];
-      return (appData.cash || []).filter(c => getComparableDate(c.date) === getComparableDate(sale.date) && isSameTrainForCashSale(c, sale));
+      return (appData.cash || []).filter(c => getCashDashboardDate(c) === getSalesEntryArrivalDate(sale) && isSameTrainForCashSale(c, sale));
     }
 
     function getCashDepositStatusForSale(sale) {
@@ -6288,7 +6289,7 @@ function showPage(page) {
     }
 
     function setSalesEntryFieldsDisabled(disabled) {
-      ['salesRakeManager','salesAchievement','salesStoreBill','salesBaseExpense','salesCreditExpense','salesCashExpense','salesMiscExpense','salesStaffSalary','salesManagerSalary','salesECatering','salesRemarks'].forEach(id => {
+      ['salesDepartureDate','salesDate','salesRakeManager','salesAchievement','salesStoreBill','salesBaseExpense','salesCreditExpense','salesCashExpense','salesMiscExpense','salesStaffSalary','salesManagerSalary','salesECatering','salesRemarks'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.disabled = disabled;
       });
@@ -6300,14 +6301,14 @@ function showPage(page) {
       document.getElementById('salesTrainId').value = entry.trainId || '';
       document.getElementById('salesTrainSearch').value = entry.trainName || '';
       document.getElementById('salesDepartureDate').value = entry.departureDate || entry.date || '';
-      document.getElementById('salesDate').value = entry.date || '';
+      document.getElementById('salesDate').value = entry.arrivalDate || entry.date || '';
       salesCostDetails = JSON.parse(JSON.stringify(entry.detailLines || entry.salesCostDetails || {}));
       salesSalaryDetails = JSON.parse(JSON.stringify(entry.salaryDetails || []));
       document.getElementById('salesTrainNo').value = entry.trainNumber || '';
       document.getElementById('salesYard').value = entry.yard || '';
       document.getElementById('salesClusterManager').value = entry.clusterManager || '';
       document.getElementById('salesTrainManager').value = entry.trainManager || '';
-      const selectedMaster = getEffectiveMaster(entry.trainNumber, entry.trainName, entry.date, entry.rakeManager, entry.rakeNumber);
+      const selectedMaster = getEffectiveMaster(entry.trainNumber, entry.trainName, entry.arrivalDate || entry.date, entry.rakeManager, entry.rakeNumber);
       populateSalesRakeManagers(selectedMaster || {
         trainNumber: entry.trainNumber,
         trainName: entry.trainName,
@@ -6379,7 +6380,7 @@ function showPage(page) {
       if (!trainId || !date) return;
       const train = (appData.trainMasters || []).find(t => t.id == trainId);
       if (!train) return;
-      const existing = findSalesEntryByDateTrain(date, train.trainNumber, train.trainName, trainId);
+      const existing = findSalesEntryByDateTrain(date, train.trainNumber, train.trainName, trainId, editingType === 'sales' ? editingId : null);
       if (!existing) {
         if (editingType === 'sales') {
           editingId = null;
@@ -6841,16 +6842,24 @@ function showPage(page) {
 
       let filtered = [...(appData.sales || [])];
       
-      if (fromDate) filtered = filtered.filter(s => s.date >= fromDate);
-      if (toDate) filtered = filtered.filter(s => s.date <= toDate);
+      if (fromDate) filtered = filtered.filter(s => getSalesEntryArrivalDate(s) >= fromDate);
+      if (toDate) filtered = filtered.filter(s => getSalesEntryArrivalDate(s) <= toDate);
       if (trainFilter) filtered = filtered.filter(s => s.trainName === trainFilter);
       if (yardFilter) filtered = filtered.filter(s => s.yard === yardFilter);
       if (managerFilter) filtered = filtered.filter(s => s.trainManager === managerFilter);
 
       if (currentUser.yard !== 'ALL') filtered = filtered.filter(s => s.yard === currentUser.yard);
 
-      filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+      filtered.sort((a, b) => new Date(getSalesEntryArrivalDate(b)) - new Date(getSalesEntryArrivalDate(a)));
       return filtered;
+    }
+
+    function getSalesEntryArrivalDate(entry) {
+      return getComparableDate(entry?.arrivalDate || entry?.date || '');
+    }
+
+    function getSalesEntryDepartureDate(entry) {
+      return getComparableDate(entry?.departureDate || entry?.entryDate || entry?.date || '');
     }
 
     function loadSalesList() {
@@ -6865,7 +6874,8 @@ function showPage(page) {
 
       document.getElementById('salesTableBody').innerHTML = filtered.map(s => `
         <tr>
-          <td>${formatDate(s.date)}</td>
+          <td>${formatDate(getSalesEntryArrivalDate(s))}</td>
+          <td>${formatDate(getSalesEntryDepartureDate(s))}</td>
           <td>${s.trainName}</td>
           <td>${s.yard}</td>
           <td>${formatCurrency(s.salesAchievement)}</td>
@@ -8169,7 +8179,7 @@ function showPage(page) {
     function findDuplicateEntry(rows, date, trainNumber, trainName, excludeId = null) {
       const day = getComparableDate(date);
       const key = buildTrainKey(trainNumber, trainName);
-      return (rows || []).find(row => row.id != excludeId && getComparableDate(row.date) === day && buildTrainKey(row.trainNumber || row.trainNo, row.trainName) === key);
+      return (rows || []).find(row => row.id != excludeId && getComparableDate(row.arrivalDate || row.date) === day && buildTrainKey(row.trainNumber || row.trainNo, row.trainName) === key);
     }
 
     function pushOrOverwriteEntry(collectionName, entry, overwriteState) {
