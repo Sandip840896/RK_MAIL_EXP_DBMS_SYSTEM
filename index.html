@@ -3771,6 +3771,7 @@ function showPage(page) {
         if (filter.type === 'train') filtered = filtered.filter(c => c.trainName === filter.value);
         if (filter.type === 'status') filtered = filtered.filter(c => c.status === filter.value);
         if (filter.type === 'source') filtered = filtered.filter(c => c.source === filter.value);
+        if (filter.type === 'yard') filtered = filtered.filter(c => (c.yard || 'Unknown') === filter.value);
         if (filter.type === 'mobile') filtered = filtered.filter(c => normalizeMobileNo(c.mobileNo) === normalizeMobileNo(filter.value));
         if (filter.type === 'date') filtered = filtered.filter(c => c.date === filter.value);
         if (filter.type === 'nature') filtered = filtered.filter(c => (c.complainNature || c.complaintType || 'Unknown') === filter.value);
@@ -5252,6 +5253,12 @@ function showPage(page) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          onClick: (e, elements) => {
+            if (elements.length > 0) {
+              const index = elements[0].index;
+              toggleComplaintChartFilter('yard', yards[index]);
+            }
+          },
           plugins: { legend: { position: 'top', labels: { color: '#64748b', font: { size: 10 } } } },
           scales: {
             y: { beginAtZero: true, grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 10 } } },
