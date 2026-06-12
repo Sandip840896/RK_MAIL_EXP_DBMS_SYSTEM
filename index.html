@@ -163,7 +163,7 @@
     .rake-summary-scroll { overflow-x: auto; max-height: 515px; overflow-y: auto; scrollbar-gutter: stable; }
     .rank-table-scroll { overflow-x: auto; max-height: 515px; overflow-y: auto; scrollbar-gutter: stable; }
     .pending-deposit-scroll { overflow-x: auto; max-height: 515px; overflow-y: auto; scrollbar-gutter: stable; }
-    #trainManagerSalesSummaryTable { min-width: 900px; }
+    #trainManagerSalesSummaryTable { min-width: 1450px; }
     #trainManagerSalesSummaryTable thead,
     #trainManagerSalesSummaryTable tbody tr { display: table; width: 100%; table-layout: fixed; }
     #trainManagerSalesSummaryTable tbody { display: block; max-height: 455px; overflow-y: scroll; scrollbar-gutter: stable; }
@@ -887,6 +887,10 @@
                   <tr>
                     <th>Rake Manager</th>
                     <th>Mobile Number</th>
+                    <th>ADHAR Number</th>
+                    <th>Account Number</th>
+                    <th>IFSC Code</th>
+                    <th>Bank Name</th>
                     <th>Trains</th>
                     <th>Entries</th>
                     <th>Total Sale</th>
@@ -1358,6 +1362,8 @@
                   <div class="amount-with-detail">
                     <input type="number" id="salesStoreBill" oninput="calculateSalesCostsAndGp()">
                     <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('storeBill')" title="Add detail"><i class="fas fa-list"></i></button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('supportStoreBill').click()" title="Upload receipt"><i class="fas fa-camera"></i></button>
+                    <input type="file" id="supportStoreBill" accept="image/*" capture="environment" multiple style="display:none" onchange="handleSalesSupportUpload('storeBill', this)">
                   </div>
                 </div>
                 <div class="form-field">
@@ -1365,6 +1371,8 @@
                   <div class="amount-with-detail">
                     <input type="number" id="salesBaseExpense" oninput="calculateSalesCostsAndGp()">
                     <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('baseExpense')" title="Add detail"><i class="fas fa-list"></i></button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('supportBaseExpense').click()" title="Upload receipt"><i class="fas fa-camera"></i></button>
+                    <input type="file" id="supportBaseExpense" accept="image/*" capture="environment" multiple style="display:none" onchange="handleSalesSupportUpload('baseExpense', this)">
                   </div>
                 </div>
                 <div class="form-field">
@@ -1372,6 +1380,8 @@
                   <div class="amount-with-detail">
                     <input type="number" id="salesCreditExpense" oninput="calculateSalesCostsAndGp()">
                     <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('creditExpense')" title="Add detail"><i class="fas fa-list"></i></button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('supportCreditExpense').click()" title="Upload receipt"><i class="fas fa-camera"></i></button>
+                    <input type="file" id="supportCreditExpense" accept="image/*" capture="environment" multiple style="display:none" onchange="handleSalesSupportUpload('creditExpense', this)">
                   </div>
                 </div>
                 <div class="form-field">
@@ -1384,9 +1394,10 @@
                 <div class="form-field">
                   <label>MISC Expenses</label>
                   <div class="amount-with-detail">
-                    <input type="number" id="salesMiscExpense" oninput="calculateSalesCostsAndGp()">
+                    <input type="number" id="salesMiscExpense" oninput="salesMiscManual = true; calculateSalesCostsAndGp()">
                     <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('miscExpense')" title="Add detail"><i class="fas fa-list"></i></button>
                   </div>
+                  <small id="salesMiscLimitHint" style="font-size:11px;color:#64748b;"></small>
                 </div>
                 <div class="form-field">
                   <label>Commission (10% Of Sales)</label>
@@ -1488,6 +1499,7 @@
                       <th>Yard</th>
                       <th>Sales</th>
                       <th>Total Sale</th>
+                      <th>Supporting</th>
                       <th>Remarks</th>
                       <th>Actions</th>
                     </tr>
@@ -2274,6 +2286,25 @@
 
             <div class="form-row">
               <div class="form-field">
+                <label>Rake Manager ADHAR Number</label>
+                <input type="text" id="masterRakeManagerAadhar" placeholder="ADHAR number">
+              </div>
+              <div class="form-field">
+                <label>Account Number</label>
+                <input type="text" id="masterRakeManagerAccount" placeholder="Bank account number">
+              </div>
+              <div class="form-field">
+                <label>IFSC Code</label>
+                <input type="text" id="masterRakeManagerIfsc" placeholder="IFSC code">
+              </div>
+              <div class="form-field">
+                <label>Bank Name</label>
+                <input type="text" id="masterRakeManagerBank" placeholder="BANK NAME" oninput="this.value = this.value.toUpperCase()">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-field">
                 <label>Business Head</label>
                 <input type="text" id="masterBusinessHead" placeholder="Business head name">
               </div>
@@ -2385,6 +2416,10 @@
                     <th>Manager No</th>
                     <th>Rake Manager</th>
                     <th>Rake Manager No</th>
+                    <th>ADHAR No</th>
+                    <th>Account No</th>
+                    <th>IFSC</th>
+                    <th>Bank</th>
                     <th>Business Head</th>
                     <th>VP</th>
                     <th>Valid From</th>
@@ -2403,6 +2438,10 @@
                     <th><select id="masterFilterManager" onchange="loadMasterTable()"><option value="">All</option></select></th>
                     <th></th>
                     <th><select id="masterFilterRakeManager" onchange="loadMasterTable()"><option value="">All</option></select></th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
                     <th></th>
                     <th><input id="masterFilterBusinessHead" placeholder="Filter" oninput="loadMasterTable()"></th>
                     <th><input id="masterFilterVp" placeholder="Filter" oninput="loadMasterTable()"></th>
@@ -2753,10 +2792,22 @@
         <button class="btn btn-secondary btn-sm" onclick="addSalesDetailLine()"><i class="fas fa-plus"></i> Add Line</button>
         <strong>Total: <span id="salesDetailTotal">Rs.0</span></strong>
       </div>
+      <div id="salesSupportPreview" style="margin-top:12px;"></div>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
         <button class="btn btn-secondary" onclick="closeSalesDetailModal()">Cancel</button>
         <button class="btn btn-primary" onclick="applySalesDetailModal()">Apply Total</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Sales support image preview modal -->
+  <div id="salesSupportModal" class="modal-overlay">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3 class="modal-title" id="salesSupportModalTitle">Supporting Images</h3>
+        <button class="modal-close" onclick="closeSalesSupportModal()">&times;</button>
+      </div>
+      <div id="salesSupportModalBody" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;"></div>
     </div>
   </div>
 
@@ -2969,6 +3020,8 @@ console.log("✅ Connected to NEW Firebase");
     let salesCostDetails = {};
     let salesSalaryDetails = [];
     let currentSalesDetailField = '';
+    let salesSupportFiles = {};
+    let salesMiscManual = false;
     const MASTER_DELETE_KEY = 'RKRESET2026';
     const noDataPopupShown = { sales: false, complaints: false, cash: false };
 
@@ -4518,6 +4571,7 @@ function showPage(page) {
     function renderTrainManagerSalesSummary(sales) {
       const tbody = document.getElementById('trainManagerSalesSummaryBody');
       if (!tbody) return;
+      const getBank = (manager, phone) => getRakeManagerBankDetails(manager, phone);
       const groups = {};
       sales.forEach(s => {
         const manager = s.rakeManager || 'Unassigned';
@@ -4547,7 +4601,7 @@ function showPage(page) {
         .map(([manager, data]) => ({ manager, ...data, trainCount: data.trains.size }))
         .sort((a, b) => b.totalSale - a.totalSale);
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#64748b;">No sales data available for selected period.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#64748b;">No sales data available for selected period.</td></tr>';
         return;
       }
       const totalTrainSet = new Set();
@@ -4563,6 +4617,10 @@ function showPage(page) {
         <tr class="summary-total-row">
           <td>Total</td>
           <td>-</td>
+          <td>-</td>
+          <td>-</td>
+          <td>-</td>
+          <td>-</td>
           <td>${totalRow.trainCount}</td>
           <td>${totalRow.entries}</td>
           <td>${formatCurrency(totalRow.totalSale)}</td>
@@ -4570,16 +4628,41 @@ function showPage(page) {
           <td>${formatCurrency(totalRow.managerSalary)}</td>
         </tr>
       ` + rows.map(r => `
+        ${(() => {
+          const bank = getBank(r.manager, r.phone);
+          return `
         <tr>
           <td>${r.manager}</td>
           <td>${r.phone || '-'}</td>
+          <td>${bank.aadhar || '-'}</td>
+          <td>${bank.account || '-'}</td>
+          <td>${bank.ifsc || '-'}</td>
+          <td>${bank.bank || '-'}</td>
           <td>${r.trainCount}</td>
           <td>${r.entries}</td>
           <td>${formatCurrency(r.totalSale)}</td>
           <td>${formatCurrency(r.totalGp)}</td>
           <td>${formatCurrency(r.managerSalary)}</td>
         </tr>
+          `;
+        })()}
       `).join('');
+    }
+
+    function getRakeManagerBankDetails(managerName, phone = '') {
+      const nameKey = normalizeText(managerName);
+      const phoneKey = String(phone || '').replace(/\D/g, '');
+      const match = (appData.trainMasters || []).find(t => {
+        const masterName = normalizeText(t.rakeManager);
+        const masterPhone = String(t.rakeManagerContact || t.rakeManagerPhone || '').replace(/\D/g, '');
+        return masterName && masterName === nameKey && (!phoneKey || !masterPhone || masterPhone === phoneKey);
+      }) || (appData.trainMasters || []).find(t => normalizeText(t.rakeManager) === nameKey);
+      return {
+        aadhar: match?.rakeManagerAadhar || '',
+        account: match?.rakeManagerAccount || '',
+        ifsc: match?.rakeManagerIfsc || '',
+        bank: match?.rakeManagerBank || ''
+      };
     }
 
     function renderRankTable(sales, complaints, cash) {
@@ -6304,6 +6387,8 @@ function showPage(page) {
       document.getElementById('salesDate').value = entry.arrivalDate || entry.date || '';
       salesCostDetails = JSON.parse(JSON.stringify(entry.detailLines || entry.salesCostDetails || {}));
       salesSalaryDetails = JSON.parse(JSON.stringify(entry.salaryDetails || []));
+      salesSupportFiles = JSON.parse(JSON.stringify(entry.supportingFiles || {}));
+      salesMiscManual = true;
       document.getElementById('salesTrainNo').value = entry.trainNumber || '';
       document.getElementById('salesYard').value = entry.yard || '';
       document.getElementById('salesClusterManager').value = entry.clusterManager || '';
@@ -6416,6 +6501,110 @@ function showPage(page) {
       { item: 'P.Car', rate: 500, qty: 1, amount: 500 }
     ];
 
+    const SALES_SUPPORT_FIELDS = {
+      storeBill: 'Store Bill',
+      baseExpense: 'Base Expenses',
+      creditExpense: 'Credit Expenses'
+    };
+
+    function getMiscLimitAmount() {
+      const totalSale = Number(document.getElementById('salesAchievement')?.value) || 0;
+      return Math.round(totalSale * 0.01);
+    }
+
+    function syncAutoMiscExpense() {
+      const miscInput = document.getElementById('salesMiscExpense');
+      const hint = document.getElementById('salesMiscLimitHint');
+      if (!miscInput) return;
+      const limit = getMiscLimitAmount();
+      if (!salesMiscManual) miscInput.value = limit || '';
+      const value = Number(miscInput.value) || 0;
+      if (hint) {
+        hint.textContent = `Auto 1% limit: ${formatCurrency(limit)}`;
+        hint.style.color = value > limit ? '#dc2626' : '#64748b';
+      }
+    }
+
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function handleSalesSupportUpload(field, input) {
+      const files = Array.from(input.files || []);
+      if (!SALES_SUPPORT_FIELDS[field] || !files.length) return;
+      salesSupportFiles[field] = Array.isArray(salesSupportFiles[field]) ? salesSupportFiles[field] : [];
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) continue;
+        const dataUrl = await readFileAsDataUrl(file);
+        salesSupportFiles[field].push({
+          name: file.name || `${field}_${Date.now()}.jpg`,
+          type: file.type,
+          size: file.size,
+          uploadedAt: new Date().toISOString(),
+          dataUrl
+        });
+      }
+      input.value = '';
+      showAlert(`${files.length} supporting image(s) attached for ${SALES_SUPPORT_FIELDS[field]}.`, 'success');
+      if (currentSalesDetailField === field) renderSalesSupportPreview(field);
+    }
+
+    function getSalesSupportCount(entryOrFiles) {
+      const source = entryOrFiles?.supportingFiles || entryOrFiles || {};
+      return Object.values(SALES_SUPPORT_FIELDS).length && Object.keys(SALES_SUPPORT_FIELDS)
+        .reduce((sum, field) => sum + ((source[field] || []).length || 0), 0);
+    }
+
+    function renderSalesSupportPreview(field) {
+      const container = document.getElementById('salesSupportPreview');
+      if (!container) return;
+      if (!SALES_SUPPORT_FIELDS[field]) {
+        container.innerHTML = '';
+        return;
+      }
+      const files = salesSupportFiles[field] || [];
+      container.innerHTML = `
+        <div style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">
+          <strong>${SALES_SUPPORT_FIELDS[field]} Supporting Images:</strong> ${files.length}
+          ${files.length ? `<button class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="openSalesSupportModalFromDraft('${field}')"><i class="fas fa-eye"></i> View</button>` : ''}
+        </div>
+      `;
+    }
+
+    function openSalesSupportModalFromDraft(field) {
+      openSalesSupportModalForFiles(SALES_SUPPORT_FIELDS[field] || 'Supporting Images', salesSupportFiles[field] || []);
+    }
+
+    function openSalesSupportModal(id) {
+      const entry = (appData.sales || []).find(s => String(s.id) === String(id));
+      if (!entry) return;
+      const files = Object.entries(SALES_SUPPORT_FIELDS).flatMap(([field, label]) =>
+        (entry.supportingFiles?.[field] || []).map(file => ({ ...file, label }))
+      );
+      openSalesSupportModalForFiles(`${entry.trainName || 'Sales'} Supporting Images`, files);
+    }
+
+    function openSalesSupportModalForFiles(title, files) {
+      document.getElementById('salesSupportModalTitle').textContent = title;
+      const body = document.getElementById('salesSupportModalBody');
+      body.innerHTML = files.length ? files.map(file => `
+        <div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#fff;">
+          <div style="font-size:12px;font-weight:600;margin-bottom:6px;">${file.label || ''} ${file.name || ''}</div>
+          <img src="${file.dataUrl}" alt="${file.name || 'support'}" style="width:100%;max-height:260px;object-fit:contain;border-radius:6px;background:#f8fafc;">
+        </div>
+      `).join('') : '<p style="color:#64748b;">No supporting images attached.</p>';
+      document.getElementById('salesSupportModal').classList.add('active');
+    }
+
+    function closeSalesSupportModal() {
+      document.getElementById('salesSupportModal').classList.remove('active');
+    }
+
     function onSalesDatesChange() {
       refreshSalesTargetForDate();
       if (salesSalaryDetails.length) {
@@ -6451,6 +6640,7 @@ function showPage(page) {
       if (!salesCostDetails[field].length) salesCostDetails[field].push({ item: '', rate: 0, qty: 1, amount: 0 });
       document.getElementById('salesDetailModalTitle').textContent = `${config.label} Detail`;
       renderSalesDetailLines();
+      renderSalesSupportPreview(field);
       document.getElementById('salesDetailModal').classList.add('active');
     }
 
@@ -6506,6 +6696,7 @@ function showPage(page) {
       const config = SALES_DETAIL_CONFIG[currentSalesDetailField];
       if (!config) return;
       document.getElementById(config.inputId).value = Math.round(getSalesDetailTotal(currentSalesDetailField));
+      if (currentSalesDetailField === 'miscExpense') salesMiscManual = true;
       closeSalesDetailModal();
       calculateSalesCostsAndGp();
     }
@@ -6611,6 +6802,7 @@ function showPage(page) {
 
     function getCurrentSalesCostValues() {
       const totalSale = Number(document.getElementById('salesAchievement')?.value) || 0;
+      syncAutoMiscExpense();
       const storeBill = Number(document.getElementById('salesStoreBill')?.value) || 0;
       const baseExpense = Number(document.getElementById('salesBaseExpense')?.value) || 0;
       const creditExpense = Number(document.getElementById('salesCreditExpense')?.value) || 0;
@@ -6661,9 +6853,16 @@ function showPage(page) {
       const gpAchievement = document.getElementById('salesGpAchievement').value;
       const gpTarget = Number(document.getElementById('salesGpTarget').value) || 0;
       const remarks = document.getElementById('salesRemarks').value.trim();
+      const miscLimit = getMiscLimitAmount();
+      const miscValue = Number(document.getElementById('salesMiscExpense')?.value) || 0;
 
       if (!trainId || !departureDate || !date || !salesAchievement) {
         showAlert('Please fill train, departure date, arrival date and total sale', 'error');
+        return;
+      }
+      if (miscValue > miscLimit) {
+        showAlert(`MISC Expenses cannot cross 1% of Total Sale (${formatCurrency(miscLimit)}).`, 'error');
+        document.getElementById('salesMiscExpense').focus();
         return;
       }
 
@@ -6770,6 +6969,7 @@ function showPage(page) {
         amountToCollect: Math.round(salesCosts.amountToCollect),
         detailLines: JSON.parse(JSON.stringify(salesCostDetails || {})),
         salaryDetails: JSON.parse(JSON.stringify(salesSalaryDetails || [])),
+        supportingFiles: JSON.parse(JSON.stringify(salesSupportFiles || {})),
         salesReopenedAfterCash: existingForEdit?.salesReopenedAfterCash || false,
         salesReopenApprovedBy: existingForEdit?.salesReopenApprovedBy || '',
         salesReopenApprovedAt: existingForEdit?.salesReopenApprovedAt || '',
@@ -6802,7 +7002,9 @@ function showPage(page) {
       pendingSalesReopen = null;
       salesCostDetails = {};
       salesSalaryDetails = [];
+      salesSupportFiles = {};
       currentSalesDetailField = '';
+      salesMiscManual = false;
       setSalesEntryFieldsDisabled(false);
       document.getElementById('salesTrainId').value = '';
       document.getElementById('salesTrainSearch').value = '';
@@ -6880,6 +7082,7 @@ function showPage(page) {
           <td>${s.yard}</td>
           <td>${formatCurrency(s.salesAchievement)}</td>
           <td>${formatCurrency(s.gpAchievement)}</td>
+          <td>${getSalesSupportCount(s) ? `<button class="btn btn-ghost btn-sm" onclick="openSalesSupportModal('${s.id}')"><i class="fas fa-image"></i> ${getSalesSupportCount(s)}</button>` : '-'}</td>
           <td>${s.remarks || '-'}</td>
           <td>
             ${rowActions(s.id)}
@@ -7635,6 +7838,10 @@ function showPage(page) {
       const trainManagerContact = document.getElementById('masterTrainManagerPhone').value.trim();
       const rakeManager = document.getElementById('masterRakeManager').value.trim();
       const rakeManagerContact = document.getElementById('masterRakeManagerPhone').value.trim();
+      const rakeManagerAadhar = document.getElementById('masterRakeManagerAadhar').value.trim();
+      const rakeManagerAccount = document.getElementById('masterRakeManagerAccount').value.trim();
+      const rakeManagerIfsc = document.getElementById('masterRakeManagerIfsc').value.trim().toUpperCase();
+      const rakeManagerBank = document.getElementById('masterRakeManagerBank').value.trim().toUpperCase();
       const businessHead = document.getElementById('masterBusinessHead').value.trim();
       const vp = document.getElementById('masterVp').value.trim();
       const validFrom = document.getElementById('masterValidFrom').value;
@@ -7663,6 +7870,10 @@ function showPage(page) {
         rakeManager: rakeManager,
         rakeManagerContact: rakeManagerContact,
         rakeManagerPhone: rakeManagerContact,
+        rakeManagerAadhar: rakeManagerAadhar,
+        rakeManagerAccount: rakeManagerAccount,
+        rakeManagerIfsc: rakeManagerIfsc,
+        rakeManagerBank: rakeManagerBank,
         businessHead: businessHead,
         vp: vp,
         salesTarget: Math.round(Number(document.getElementById('masterSalesTarget').value)) || 0,
@@ -7755,6 +7966,10 @@ function showPage(page) {
       document.getElementById('masterTrainManagerPhone').value = '';
       document.getElementById('masterRakeManager').value = '';
       document.getElementById('masterRakeManagerPhone').value = '';
+      document.getElementById('masterRakeManagerAadhar').value = '';
+      document.getElementById('masterRakeManagerAccount').value = '';
+      document.getElementById('masterRakeManagerIfsc').value = '';
+      document.getElementById('masterRakeManagerBank').value = '';
       document.getElementById('masterBusinessHead').value = '';
       document.getElementById('masterVp').value = '';
       document.getElementById('masterSalesTarget').value = '';
@@ -7859,6 +8074,10 @@ function showPage(page) {
           <td>${t.trainManagerContact || t.trainManagerPhone || '-'}</td>
           <td>${t.rakeManager || '-'}</td>
           <td>${t.rakeManagerContact || t.rakeManagerPhone || '-'}</td>
+          <td>${t.rakeManagerAadhar || '-'}</td>
+          <td>${t.rakeManagerAccount || '-'}</td>
+          <td>${t.rakeManagerIfsc || '-'}</td>
+          <td>${t.rakeManagerBank || '-'}</td>
           <td>${t.businessHead || '-'}</td>
           <td>${t.vp || '-'}</td>
           <td>${t.validFrom || '-'}</td>
@@ -7892,6 +8111,10 @@ function showPage(page) {
       document.getElementById('masterTrainManagerPhone').value = t.trainManagerContact || t.trainManagerPhone || '';
       document.getElementById('masterRakeManager').value = t.rakeManager || '';
       document.getElementById('masterRakeManagerPhone').value = t.rakeManagerContact || t.rakeManagerPhone || '';
+      document.getElementById('masterRakeManagerAadhar').value = t.rakeManagerAadhar || '';
+      document.getElementById('masterRakeManagerAccount').value = t.rakeManagerAccount || '';
+      document.getElementById('masterRakeManagerIfsc').value = t.rakeManagerIfsc || '';
+      document.getElementById('masterRakeManagerBank').value = t.rakeManagerBank || '';
       document.getElementById('masterBusinessHead').value = t.businessHead || '';
       document.getElementById('masterVp').value = t.vp || '';
       document.getElementById('masterSalesTarget').value = Math.round(Number(t.salesTarget) || 0);
@@ -8501,6 +8724,10 @@ function showPage(page) {
             businessHead: getColumnValue(row, ['Business Head', 'businesshead']) || '',
             vp: getColumnValue(row, ['VP', 'Vice President', 'vicepresident', 'VP,s']) || '',
             rakeManagerContact: getColumnValue(row, ['CONTACT NO', 'Contact No', 'Rake Manager Contact']) || '',
+            rakeManagerAadhar: getColumnValue(row, ['Rake Manager ADHAR Number', 'Rake Manager Aadhar', 'ADHAR Number', 'Aadhar Number']) || '',
+            rakeManagerAccount: getColumnValue(row, ['Account Number', 'Rake Manager Account Number', 'Bank Account Number']) || '',
+            rakeManagerIfsc: String(getColumnValue(row, ['IFSC Code', 'IFSC', 'Rake Manager IFSC']) || '').toUpperCase(),
+            rakeManagerBank: String(getColumnValue(row, ['Bank Name', 'Rake Manager Bank Name']) || '').toUpperCase(),
             trainManagerContact: getColumnValue(row, ['TRAIN MANAGER NUMBER', 'Train Manager Number']) || '',
             businessHeadContact: getColumnValue(row, ['BUSINESS HEAD MOBILE NUMBER', 'Business Head Mobile Number']) || '',
             vpContact: getColumnValue(row, ['VP,s MOBILE NUMBER', 'VP Mobile Number']) || '',
@@ -8830,6 +9057,10 @@ function showPage(page) {
         'No Of Rakes': 'R-1',
         'NAME': 'Rake M',
         'CONTACT NO': '9000000004',
+        'Rake Manager ADHAR Number': '123412341234',
+        'Account Number': '123456789012',
+        'IFSC Code': 'HDFC0001234',
+        'Bank Name': 'HDFC BANK',
         'Valid From': start,
         'Valid To': endDate.toISOString().split('T')[0],
         'Valid Days': 30,
@@ -8844,6 +9075,11 @@ function showPage(page) {
         'Cluster Manager': 'Manager A',
         'Train Manager': 'Manager B',
         'Rake Manager': 'Rake M',
+        'Rake Manager Phone': '9000000004',
+        'Rake Manager ADHAR Number': '123412341234',
+        'Account Number': '123456789012',
+        'IFSC Code': 'HDFC0001234',
+        'Bank Name': 'HDFC BANK',
         'Business Head': 'Business Head A',
         'VP': 'VP A',
         'Valid From': start,
@@ -8900,6 +9136,10 @@ function showPage(page) {
         'Credit Expenses': s.creditExpense || 0,
         'Cash Expenses': s.cashExpense || 0,
         'MISC Expenses': s.miscExpense || 0,
+        'Supporting Images Count': getSalesSupportCount(s),
+        'Store Bill Supporting': (s.supportingFiles?.storeBill || []).map(f => f.name).join(', '),
+        'Base Expenses Supporting': (s.supportingFiles?.baseExpense || []).map(f => f.name).join(', '),
+        'Credit Expenses Supporting': (s.supportingFiles?.creditExpense || []).map(f => f.name).join(', '),
         Commission: s.cashCommission || 0,
         'Staff Salary': s.staffSalary || 0,
         'Rake Manager Salary': s.managerSalary || 0,
@@ -9137,8 +9377,8 @@ function showPage(page) {
         y = addPdfSectionTitle(doc, title, y);
         doc.autoTable({
           startY: y,
-          head: [['Date', 'Train', 'No', 'Yard', 'Train Manager', 'Rake Manager', 'Target', 'Sale', 'GP', 'Salary']],
-          body: rows.map(r => [formatDate(r.date), r.trainName || '-', r.trainNumber || '-', r.yard || '-', r.trainManager || '-', r.rakeManager || '-', pdfMoney(r.salesTarget), pdfMoney(r.salesAchievement || r.totalSale), pdfMoney(r.gpAchievement), pdfMoney(r.managerSalary)]),
+          head: [['Date', 'Train', 'No', 'Yard', 'Train Manager', 'Rake Manager', 'Target', 'Sale', 'GP', 'Salary', 'Support']],
+          body: rows.map(r => [formatDate(r.date), r.trainName || '-', r.trainNumber || '-', r.yard || '-', r.trainManager || '-', r.rakeManager || '-', pdfMoney(r.salesTarget), pdfMoney(r.salesAchievement || r.totalSale), pdfMoney(r.gpAchievement), pdfMoney(r.managerSalary), getSalesSupportCount(r)]),
           styles: { fontSize: 6.5, cellPadding: 1.2, overflow: 'linebreak' },
           headStyles: { fillColor: [2, 132, 199] },
           margin: { left: 14, right: 14 }
@@ -9568,6 +9808,10 @@ function showPage(page) {
     window.calculateSalesPct = calculateSalesPct;
     window.calculateSalesCostsAndGp = calculateSalesCostsAndGp;
     window.calculateGpPct = calculateGpPct;
+    window.handleSalesSupportUpload = handleSalesSupportUpload;
+    window.openSalesSupportModal = openSalesSupportModal;
+    window.openSalesSupportModalFromDraft = openSalesSupportModalFromDraft;
+    window.closeSalesSupportModal = closeSalesSupportModal;
     window.validateAndSaveSalesEntry = validateAndSaveSalesEntry;
     window.confirmGpApproval = confirmGpApproval;
     window.closeGpWarningModal = closeGpWarningModal;
