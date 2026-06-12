@@ -8084,9 +8084,34 @@ function showPage(page) {
           <td>${t.validTo || 'Open'}</td>
           <td>${formatCurrency(t.salesTarget)}</td>
           <td>${formatCurrency(t.gpTarget)}</td>
-          <td>${canEdit ? `<button class="btn-icon edit" onclick="editMasterRow(${t.id})"><i class="fas fa-edit"></i></button>` : '<span style="font-size:11px;color:#64748b;">View</span>'}</td>
+          <td>${canEdit ? `<button class="btn-icon edit" onclick="editMasterRow(${t.id})"><i class="fas fa-edit"></i></button><button class="btn-icon delete" onclick="deleteMasterRow(${t.id})"><i class="fas fa-trash"></i></button>` : '<span style="font-size:11px;color:#64748b;">View</span>'}</td>
         </tr>
       `).join('');
+    }
+
+    function deleteMasterRow(id) {
+      const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'super_admin');
+      if (!canEdit) {
+        showAlert('Only Admin and Super Admin can delete train master rows.', 'warning');
+        return;
+      }
+      const row = (appData.trainMasters || []).find(t => String(t.id) === String(id));
+      if (!row) {
+        showAlert('Train master row not found. Please refresh and try again.', 'error');
+        return;
+      }
+      const label = `${row.trainName || ''} ${row.trainNumber || ''} ${row.rakeNumber || ''} ${row.rakeManager || ''}`.trim();
+      if (!confirm(`Delete this Train Manager Master row?\n\n${label}\n\nExisting sales, complaint and cash data will remain.`)) return;
+      markRecordDeleted('trainMasters', row.id);
+      markRecordDeleted('trainMasters', makeRecordKey(row, 'trainMasters'));
+      appData.trainMasters = (appData.trainMasters || []).filter(t => String(t.id) !== String(id));
+      addMasterLog('Delete Train Master', row, 'Manual master row deleted');
+      saveData({ forceOverwrite: true });
+      if (editingType === 'master' && String(editingId) === String(id)) clearMasterForm();
+      loadMasterTable();
+      loadMasterAuditLog();
+      updateMasterTargetDisplay();
+      showAlert('Train master row deleted', 'success');
     }
 
     function editMasterRow(id) {
@@ -9847,6 +9872,7 @@ function showPage(page) {
     window.deleteAllTargetMasters = deleteAllTargetMasters;
     window.clearMasterForm = clearMasterForm;
     window.editMasterRow = editMasterRow;
+    window.deleteMasterRow = deleteMasterRow;
     window.clearMasterTableFilters = clearMasterTableFilters;
     window.onMasterClusterChange = onMasterClusterChange;
     window.onMasterTrainManagerChange = onMasterTrainManagerChange;
