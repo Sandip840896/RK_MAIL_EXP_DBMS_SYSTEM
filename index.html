@@ -6352,12 +6352,19 @@ function showPage(page) {
       document.getElementById('salesAchievementPct').value = pct + '%';
     }
 
-    function findSalesEntryByDateTrain(date, trainNumber, trainName, trainId = '', excludeId = null) {
+    function findSalesEntryByDateTrain(date, trainNumber, trainName, trainId = '', excludeId = null, rakeManager = '', rakeNumber = '') {
       const day = getComparableDate(date);
-      return (appData.sales || []).find(s => s.id != excludeId && getSalesEntryArrivalDate(s) === day && (
-        (trainId && s.trainId && String(s.trainId) === String(trainId)) ||
-        buildTrainKey(s.trainNumber, s.trainName) === buildTrainKey(trainNumber, trainName)
-      ));
+      const selectedManager = normalizeText(rakeManager);
+      const selectedRake = normalizeText(rakeNumber);
+      return (appData.sales || []).find(s => {
+        if (s.id == excludeId || getSalesEntryArrivalDate(s) !== day) return false;
+        const sameTrain = buildTrainKey(s.trainNumber, s.trainName) === buildTrainKey(trainNumber, trainName);
+        const sameMaster = trainId && s.trainId && String(s.trainId) === String(trainId);
+        if (!sameTrain && !sameMaster) return false;
+        if (selectedManager && normalizeText(s.rakeManager) !== selectedManager) return false;
+        if (selectedRake && normalizeText(s.rakeNumber) !== selectedRake) return false;
+        return true;
+      });
     }
 
     function getCashEntriesForSalesEntry(sale) {
@@ -6465,7 +6472,11 @@ function showPage(page) {
       if (!trainId || !date) return;
       const train = (appData.trainMasters || []).find(t => t.id == trainId);
       if (!train) return;
-      const existing = findSalesEntryByDateTrain(date, train.trainNumber, train.trainName, trainId, editingType === 'sales' ? editingId : null);
+      const selectedOption = document.getElementById('salesRakeManager')?.selectedOptions?.[0];
+      const selectedRakeManager = document.getElementById('salesRakeManager')?.value || train.rakeManager || '';
+      const selectedRakeNumber = selectedOption?.dataset?.rakeNumber || train.rakeNumber || '';
+      const selectedMasterId = selectedOption?.dataset?.masterId || trainId;
+      const existing = findSalesEntryByDateTrain(date, train.trainNumber, train.trainName, selectedMasterId, editingType === 'sales' ? editingId : null, selectedRakeManager, selectedRakeNumber);
       if (!existing) {
         if (editingType === 'sales') {
           editingId = null;
@@ -6926,7 +6937,7 @@ function showPage(page) {
         || getEffectiveMaster(train.trainNumber, train.trainName, date, selectedRakeManager, selectedRakeNumber)
         || resolveSelectedTrainMaster(trainId, train.trainNumber, train.trainName, date)
         || train;
-      const duplicate = findDuplicateEntry(appData.sales, date, train.trainNumber, train.trainName, editingId);
+      const duplicate = findDuplicateEntry(appData.sales, date, train.trainNumber, train.trainName, editingId, selectedRakeManager, selectedRakeNumber);
       if (duplicate && !confirm('Sales data is already available for same train number and date. Overwrite existing entry?')) return;
       const existingForEdit = editingId ? (appData.sales || []).find(s => s.id == editingId) : null;
       if (existingForEdit && getCashDepositStatusForSale(existingForEdit).completed && !existingForEdit.salesReopenedAfterCash) {
@@ -8424,10 +8435,18 @@ function showPage(page) {
       return (rows || []).map(r => getComparableDate(r.date)).filter(Boolean).sort().pop() || '';
     }
 
-    function findDuplicateEntry(rows, date, trainNumber, trainName, excludeId = null) {
+    function findDuplicateEntry(rows, date, trainNumber, trainName, excludeId = null, rakeManager = '', rakeNumber = '') {
       const day = getComparableDate(date);
       const key = buildTrainKey(trainNumber, trainName);
-      return (rows || []).find(row => row.id != excludeId && getComparableDate(row.arrivalDate || row.date) === day && buildTrainKey(row.trainNumber || row.trainNo, row.trainName) === key);
+      const selectedManager = normalizeText(rakeManager);
+      const selectedRake = normalizeText(rakeNumber);
+      return (rows || []).find(row => {
+        if (row.id == excludeId || getComparableDate(row.arrivalDate || row.date) !== day) return false;
+        if (buildTrainKey(row.trainNumber || row.trainNo, row.trainName) !== key) return false;
+        if (selectedManager && normalizeText(row.rakeManager) !== selectedManager) return false;
+        if (selectedRake && normalizeText(row.rakeNumber) !== selectedRake) return false;
+        return true;
+      });
     }
 
     function pushOrOverwriteEntry(collectionName, entry, overwriteState) {
