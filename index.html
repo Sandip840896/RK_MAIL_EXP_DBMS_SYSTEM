@@ -6531,8 +6531,11 @@ function showPage(page) {
       if (!salesMiscManual) miscInput.value = limit || '';
       const value = Number(miscInput.value) || 0;
       if (hint) {
-        hint.textContent = `Auto 1% limit: ${formatCurrency(limit)}`;
-        hint.style.color = value > limit ? '#dc2626' : '#64748b';
+        const diff = value - limit;
+        hint.textContent = diff
+          ? `Auto 1%: ${formatCurrency(limit)} | Difference: ${diff > 0 ? '+' : '-'}${formatCurrency(Math.abs(diff))}`
+          : `Auto 1%: ${formatCurrency(limit)} | Matched`;
+        hint.style.color = diff ? '#dc2626' : '#64748b';
       }
     }
 
@@ -6864,16 +6867,9 @@ function showPage(page) {
       const gpAchievement = document.getElementById('salesGpAchievement').value;
       const gpTarget = Number(document.getElementById('salesGpTarget').value) || 0;
       const remarks = document.getElementById('salesRemarks').value.trim();
-      const miscLimit = getMiscLimitAmount();
-      const miscValue = Number(document.getElementById('salesMiscExpense')?.value) || 0;
 
       if (!trainId || !departureDate || !date || !salesAchievement) {
         showAlert('Please fill train, departure date, arrival date and total sale', 'error');
-        return;
-      }
-      if (miscValue > miscLimit) {
-        showAlert(`MISC Expenses cannot cross 1% of Total Sale (${formatCurrency(miscLimit)}).`, 'error');
-        document.getElementById('salesMiscExpense').focus();
         return;
       }
 
@@ -6945,6 +6941,11 @@ function showPage(page) {
         return;
       }
       const salesCosts = getCurrentSalesCostValues();
+      const miscAutoAmount = getMiscLimitAmount();
+      const miscDifference = Math.round((Number(document.getElementById('salesMiscExpense')?.value) || 0) - miscAutoAmount);
+      if (miscDifference !== 0) {
+        showAlert(`MISC Expenses differs from 1% auto amount by ${miscDifference > 0 ? '+' : '-'}${formatCurrency(Math.abs(miscDifference))}. Manual amount will be saved.`, 'warning');
+      }
 
       const entry = {
         id: editingId || Date.now(),
@@ -6973,6 +6974,9 @@ function showPage(page) {
         creditExpense: Math.round(salesCosts.creditExpense),
         cashExpense: Math.round(salesCosts.cashExpense),
         miscExpense: Math.round(salesCosts.miscExpense),
+        miscAutoAmount: miscAutoAmount,
+        miscDifference: miscDifference,
+        miscWarning: miscDifference !== 0,
         cashCommission: Math.round(salesCosts.commission),
         staffSalary: Math.round(salesCosts.staffSalary),
         managerSalary: Math.round(salesCosts.managerSalary),
@@ -9180,6 +9184,9 @@ function showPage(page) {
         'Credit Expenses': s.creditExpense || 0,
         'Cash Expenses': s.cashExpense || 0,
         'MISC Expenses': s.miscExpense || 0,
+        'MISC Auto 1% Amount': s.miscAutoAmount || Math.round((Number(s.salesAchievement || s.totalSale) || 0) * 0.01),
+        'MISC Difference': s.miscDifference || 0,
+        'MISC Warning': s.miscWarning ? 'Yes' : 'No',
         'Supporting Images Count': getSalesSupportCount(s),
         'Store Bill Supporting': (s.supportingFiles?.storeBill || []).map(f => f.name).join(', '),
         'Base Expenses Supporting': (s.supportingFiles?.baseExpense || []).map(f => f.name).join(', '),
