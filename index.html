@@ -4839,14 +4839,77 @@ function showPage(page) {
     function getRakeOptionsForTrain(trainNumber, trainName, dateValue) {
       const day = getComparableDate(dateValue);
       return getPreferredTrainMasterMatches(trainNumber, trainName)
-        .filter(t => {
-          if (!day) return true;
-          if (t.validFrom && day < t.validFrom) return false;
-          if (t.validTo && day > t.validTo) return false;
-          return true;
-        })
         .filter(t => t.rakeManager || t.rakeNumber)
-        .sort((a, b) => String(a.rakeManager || '').localeCompare(String(b.rakeManager || '')));
+        .sort((a, b) => {
+          const notStartedRank = Number(isMasterValidityNotStarted(a, day)) - Number(isMasterValidityNotStarted(b, day));
+          if (notStartedRank) return notStartedRank;
+          const expiredRank = Number(isMasterValidityExpired(a, day)) - Number(isMasterValidityExpired(b, day));
+          if (expiredRank) return expiredRank;
+          return String(a.rakeManager || '').localeCompare(String(b.rakeManager || ''));
+        });
+    }
+
+    function isMasterValidityExpired(master, dateValue = '') {
+      const day = getComparableDate(dateValue);
+      if (!master || !day) return false;
+      return Boolean(master.validTo && day > master.validTo);
+    }
+
+    function isMasterValidityNotStarted(master, dateValue = '') {
+      const day = getComparableDate(dateValue);
+      if (!master || !day) return false;
+      return Boolean(master.validFrom && day < master.validFrom);
+    }
+
+    function warnIfMasterValidityIssue(master, contextLabel = 'Rake manager') {
+      const date = getComparableDate(document.getElementById('salesDate')?.value || document.getElementById('complaintDate')?.value || '');
+      if (!master || !date) return;
+      if (isMasterValidityExpired(master, date)) {
+        showAlert(`${contextLabel} validity expired on ${formatDate(master.validTo)}. Please inform Admin to update master validity.`, 'warning');
+      } else if (isMasterValidityNotStarted(master, date)) {
+        showAlert(`${contextLabel} validity starts from ${formatDate(master.validFrom)}. Please inform Admin if this is correct for this date.`, 'warning');
+      }
+    }
+
+    function getMasterValidityLabel(master, dateValue = '') {
+      if (isMasterValidityExpired(master, dateValue)) return ' - Validity Expired';
+      if (isMasterValidityNotStarted(master, dateValue)) return ' - Validity Not Started';
+      return '';
+    }
+
+    function findExistingTrainMasterForImport(train) {
+      const incomingTrainKey = buildTrainKey(train.trainNumber, train.trainName);
+      const incomingRakeNumber = normalizeText(train.rakeNumber);
+      const incomingRakeManager = normalizeText(train.rakeManager);
+      const incomingTrainManager = normalizeText(train.trainManager);
+      return (appData.trainMasters || []).find(t =>
+        buildTrainKey(t.trainNumber, t.trainName) === incomingTrainKey &&
+        normalizeText(t.rakeNumber) === incomingRakeNumber &&
+        normalizeText(t.rakeManager) === incomingRakeManager &&
+        normalizeText(t.trainManager) === incomingTrainManager
+      );
+    }
+
+    function mergeImportedMasterRow(existing, incoming) {
+      const merged = { ...existing, ...incoming, id: existing.id };
+      Object.keys(incoming).forEach(key => {
+        if (key === 'id') return;
+        const value = incoming[key];
+        if (value === '' || value === null || value === undefined) merged[key] = existing[key] ?? value;
+      });
+      return merged;
+    }
+
+    function findExistingTargetForImport(target) {
+      const targetKey = buildTrainKey(target.trainNumber, target.trainName);
+      const sameTrainTargets = (appData.targetMasters || []).filter(t =>
+        buildTrainKey(t.trainNumber, t.trainName) === targetKey
+      );
+      if (!sameTrainTargets.length) return null;
+      return sameTrainTargets.find(t =>
+        (t.validFrom || '') === (target.validFrom || '') &&
+        (t.validTo || '') === (target.validTo || '')
+      ) || sameTrainTargets.sort((a, b) => String(b.validFrom || '').localeCompare(String(a.validFrom || '')))[0];
     }
 
     function getRakeOptionsForTrainRack(trainNumber, trainName, rakeNumber, dateValue) {
@@ -6309,7 +6372,7 @@ function showPage(page) {
         return;
       }
       select.innerHTML = options.map(t => {
-        const label = `${t.rakeManager || 'Unassigned'}${t.rakeNumber ? ' - ' + t.rakeNumber : ''}`;
+        const label = `${t.rakeManager || 'Unassigned'}${t.rakeNumber ? ' - ' + t.rakeNumber : ''}${getMasterValidityLabel(t, date)}`;
         const phone = t.rakeManagerContact || t.rakeManagerPhone || '';
         return `<option value="${t.rakeManager || ''}" data-master-id="${t.id || ''}" data-rake-number="${t.rakeNumber || ''}" data-phone="${phone}">${label}</option>`;
       }).join('');
@@ -6338,12 +6401,15 @@ function showPage(page) {
         document.getElementById('salesClusterManager').value = editingEntry.clusterManager || document.getElementById('salesClusterManager').value;
         document.getElementById('salesTrainManager').value = editingEntry.trainManager || document.getElementById('salesTrainManager').value;
         document.getElementById('salesTrainType').value = editingEntry.trainType || document.getElementById('salesTrainType').value;
+        const editingMaster = getEffectiveMaster(trainNo, trainName, date, rakeManager, rakeNumber);
+        warnIfMasterValidityIssue(editingMaster, 'Rake manager');
         calculateSalesCostsAndGp();
         return;
       }
       const master = (masterId ? (appData.trainMasters || []).find(t => String(t.id) === String(masterId)) : null)
         || getEffectiveMaster(trainNo, trainName, date, rakeManager, rakeNumber);
       if (!master) return;
+      warnIfMasterValidityIssue(master, 'Rake manager');
       document.getElementById('salesTrainId').value = master.id || document.getElementById('salesTrainId').value;
       document.getElementById('salesYard').value = master.yard || '';
       document.getElementById('salesClusterManager').value = master.clusterManager || '';
@@ -7216,7 +7282,7 @@ function showPage(page) {
         return;
       }
       select.innerHTML = '<option value="">Select Rake Manager</option>' + options.map(t => {
-        const label = `${t.rakeManager || 'Unassigned'}${t.rakeNumber ? ' - ' + t.rakeNumber : ''}`;
+        const label = `${t.rakeManager || 'Unassigned'}${t.rakeNumber ? ' - ' + t.rakeNumber : ''}${getMasterValidityLabel(t, date)}`;
         return `<option value="${t.rakeManager || ''}" data-master-id="${t.id || ''}" data-rake-number="${t.rakeNumber || ''}">${label}</option>`;
       }).join('');
       if (selectedRakeManager) select.value = selectedRakeManager;
@@ -7232,6 +7298,7 @@ function showPage(page) {
       const masterId = document.getElementById('complaintRakeManager')?.selectedOptions?.[0]?.dataset?.masterId || '';
       const effective = (masterId ? (appData.trainMasters || []).find(t => String(t.id) === String(masterId)) : null)
         || getEffectiveMaster(trainNo, trainName, document.getElementById('complaintDate')?.value, rakeManager, rakeNumber);
+      warnIfMasterValidityIssue(effective, 'Rake manager');
       document.getElementById('complaintRakeNumber').value = effective?.rakeNumber || rakeNumber || '';
       document.getElementById('complaintRakeManagerPhone').value = effective?.rakeManagerContact || effective?.rakeManagerPhone || '';
       document.getElementById('complaintTrainManager').value = effective?.trainManager || '';
@@ -7247,6 +7314,7 @@ function showPage(page) {
           document.getElementById('complaintVp').value = optionMaster.vp || '';
           if (optionMaster.yard) document.getElementById('complaintYard').value = optionMaster.yard;
           if (optionMaster.trainType) document.getElementById('complaintTrainType').value = optionMaster.trainType;
+          warnIfMasterValidityIssue(optionMaster, 'Rake manager');
           return;
         }
       }
@@ -8808,18 +8876,12 @@ function showPage(page) {
             if (train.rakeManager && train.trainManager && !appData.rakeManagerHierarchy[train.rakeManager]) appData.rakeManagerHierarchy[train.rakeManager] = train.trainManager;
             if (train.rakeManager && !appData.rakeManagers.includes(train.rakeManager)) appData.rakeManagers.push(train.rakeManager);
 
-            const existing = (appData.trainMasters || []).find(t =>
-              normalizeTrainNo(t.trainNumber) === train.trainNumber &&
-              normalizeText(t.rakeNumber) === normalizeText(train.rakeNumber) &&
-              normalizeText(t.rakeManager) === normalizeText(train.rakeManager) &&
-              (t.validFrom || '') === (train.validFrom || '') &&
-              (t.validTo || '') === (train.validTo || '')
-            );
+            const existing = findExistingTrainMasterForImport(train);
             if (existing) {
-              if (overwriteAll === null) overwriteAll = confirm('Train Manager Master already has data for same train, rake, rake manager and validity period. Overwrite matching entries from this upload?');
+              if (overwriteAll === null) overwriteAll = confirm('Train Manager Master already has matching train, rake, train manager and rake manager rows. Update matching rows from this upload?');
               if (overwriteAll) {
                 const index = appData.trainMasters.findIndex(t => t.id == existing.id);
-                if (index >= 0) appData.trainMasters[index] = { ...train, id: existing.id };
+                if (index >= 0) appData.trainMasters[index] = mergeImportedMasterRow(existing, train);
                 applyGpTargetToTrain(train.trainNumber, train.trainName, train.gpTarget);
                 imported++;
               } else {
@@ -8887,13 +8949,9 @@ function showPage(page) {
             salesTarget,
             gpTarget
           };
-          const duplicate = (appData.targetMasters || []).find(t =>
-            buildTrainKey(t.trainNumber, t.trainName) === buildTrainKey(target.trainNumber, target.trainName) &&
-            (t.validFrom || '') === target.validFrom &&
-            (t.validTo || '') === target.validTo
-          );
+          const duplicate = findExistingTargetForImport(target);
           if (duplicate) {
-            if (overwriteAll === null) overwriteAll = confirm('Sales and GP Target Master already has data for same train and date validity. Overwrite matching entries from this upload?');
+            if (overwriteAll === null) overwriteAll = confirm('Sales and GP Target Master already has data for the same train. Update matching target rows from this upload?');
             if (!overwriteAll) { skipped++; return; }
             const index = appData.targetMasters.findIndex(t => t.id == duplicate.id);
             if (index >= 0) appData.targetMasters[index] = { ...target, id: duplicate.id };
