@@ -214,6 +214,13 @@
     .searchable-dropdown-item { padding: 10px 12px; cursor: pointer; font-size: 13px; color: #1e293b; border-bottom: 1px solid #f1f5f9; }
     .searchable-dropdown-item:hover { background: #f0f9ff; color: #0284c7; }
     .searchable-dropdown-item:last-child { border-bottom: none; }
+    .multi-filter { position: relative; }
+    .multi-filter-selected { min-height: 44px; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: #fff; cursor: text; }
+    .multi-filter-placeholder { color: #64748b; font-size: 13px; }
+    .multi-filter-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #e0f2fe; color: #075985; font-size: 12px; font-weight: 700; }
+    .multi-filter-chip button { border: 0; background: transparent; color: #075985; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+    .multi-filter-search { margin-top: 6px; min-height: 38px; font-size: 13px; }
+    .multi-filter-option { display: flex; align-items: center; gap: 8px; }
     
     /* Date Range Filter Styles */
     .date-range-section { background: #f8fafc; border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #e2e8f0; }
@@ -1003,9 +1010,13 @@
                 </div>
                 <div class="date-range-item">
                   <label>Train</label>
-                  <select id="compDashTrainFilter" onchange="loadComplaintDashboard()">
-                    <option value="">All Trains</option>
-                  </select>
+                  <div class="searchable-select multi-filter" id="compDashTrainMulti">
+                    <div class="multi-filter-selected" id="compDashTrainSelected" onclick="showCompDashTrainDropdown()">
+                      <span class="multi-filter-placeholder">All Trains</span>
+                    </div>
+                    <input type="text" id="compDashTrainSearch" class="multi-filter-search" placeholder="Search / select multiple trains..." oninput="renderCompDashTrainMultiSelect(this.value)" onfocus="showCompDashTrainDropdown()">
+                    <div class="searchable-dropdown" id="compDashTrainDropdown"></div>
+                  </div>
                 </div>
                 <div class="date-range-item">
                   <label>Status</label>
@@ -3015,6 +3026,7 @@ console.log("✅ Connected to NEW Firebase");
     let chartFilter = { type: null, value: null };
     let compChartFilter = { type: null, value: null };
     let compChartFilters = [];
+    let compDashSelectedTrains = [];
     let pendingSalesEntry = null;
     let pendingSalesReopen = null;
     let salesCostDetails = {};
@@ -3757,13 +3769,13 @@ function showPage(page) {
         }
       }
       
-      const trainFilter = document.getElementById('compDashTrainFilter')?.value;
+      const trainFilters = [...(compDashSelectedTrains || [])];
       const statusFilter = document.getElementById('compDashStatusFilter')?.value;
       const yardFilter = document.getElementById('compDashYardFilter')?.value;
 
       if (fromDate) filtered = filtered.filter(c => c.date >= fromDate);
       if (toDate) filtered = filtered.filter(c => c.date <= toDate);
-      if (trainFilter) filtered = filtered.filter(c => c.trainName === trainFilter);
+      if (trainFilters.length) filtered = filtered.filter(c => trainFilters.includes(c.trainName));
       if (statusFilter) filtered = filtered.filter(c => c.status === statusFilter);
       if (yardFilter) filtered = filtered.filter(c => c.yard === yardFilter);
 
@@ -3801,14 +3813,74 @@ function showPage(page) {
     }
 
     function populateComplaintDashboardFilters() {
-      const trains = [...new Set(appData.trainMasters.map(t => t.trainName))].filter(Boolean).sort();
       const yards = appData.yards || [];
 
-      const trainSelect = document.getElementById('compDashTrainFilter');
-      if (trainSelect) trainSelect.innerHTML = '<option value="">All Trains</option>' + trains.map(t => `<option value="${t}">${t}</option>`).join('');
+      renderCompDashTrainMultiSelect(document.getElementById('compDashTrainSearch')?.value || '');
 
       const yardSelect = document.getElementById('compDashYardFilter');
       if (yardSelect) yardSelect.innerHTML = '<option value="">All Yards</option>' + yards.map(y => `<option value="${y}">${y}</option>`).join('');
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
+    function getComplaintDashboardTrainOptions() {
+      const names = [
+        ...(appData.trainMasters || []).map(t => t.trainName),
+        ...(appData.complaints || []).map(c => c.trainName)
+      ].filter(Boolean);
+      return [...new Set(names)].sort((a, b) => String(a).localeCompare(String(b)));
+    }
+
+    function renderCompDashTrainMultiSelect(query = '') {
+      const selectedBox = document.getElementById('compDashTrainSelected');
+      const dropdown = document.getElementById('compDashTrainDropdown');
+      if (!selectedBox || !dropdown) return;
+
+      const available = getComplaintDashboardTrainOptions();
+      compDashSelectedTrains = compDashSelectedTrains.filter(t => available.includes(t));
+      selectedBox.innerHTML = compDashSelectedTrains.length
+        ? compDashSelectedTrains.map(t => `<span class="multi-filter-chip">${escapeHtml(t)} <button type="button" onclick="removeCompDashTrainFilter('${encodeURIComponent(t)}')">&times;</button></span>`).join('')
+        : '<span class="multi-filter-placeholder">All Trains</span>';
+
+      const q = normalizeText(query);
+      const shown = available.filter(t => !q || normalizeText(t).includes(q)).slice(0, 80);
+      dropdown.innerHTML = shown.length ? shown.map(t => {
+        const checked = compDashSelectedTrains.includes(t) ? 'checked' : '';
+        return `<div class="searchable-dropdown-item multi-filter-option" onclick="toggleCompDashTrainFilter('${encodeURIComponent(t)}')"><input type="checkbox" ${checked} readonly> <span>${escapeHtml(t)}</span></div>`;
+      }).join('') : '<div class="searchable-dropdown-item">No train found</div>';
+    }
+
+    function showCompDashTrainDropdown() {
+      renderCompDashTrainMultiSelect(document.getElementById('compDashTrainSearch')?.value || '');
+      document.getElementById('compDashTrainDropdown')?.classList.add('active');
+      document.getElementById('compDashTrainSearch')?.focus();
+    }
+
+    function toggleCompDashTrainFilter(encodedTrain) {
+      const train = decodeURIComponent(encodedTrain);
+      if (compDashSelectedTrains.includes(train)) {
+        compDashSelectedTrains = compDashSelectedTrains.filter(t => t !== train);
+      } else {
+        compDashSelectedTrains.push(train);
+      }
+      renderCompDashTrainMultiSelect(document.getElementById('compDashTrainSearch')?.value || '');
+      document.getElementById('compDashTrainDropdown')?.classList.add('active');
+      loadComplaintDashboard();
+    }
+
+    function removeCompDashTrainFilter(encodedTrain) {
+      const train = decodeURIComponent(encodedTrain);
+      compDashSelectedTrains = compDashSelectedTrains.filter(t => t !== train);
+      renderCompDashTrainMultiSelect(document.getElementById('compDashTrainSearch')?.value || '');
+      loadComplaintDashboard();
     }
 
     function clearSalesFilters() {
@@ -3846,7 +3918,9 @@ function showPage(page) {
       document.getElementById('compToDate1').value = '';
       document.getElementById('compFromDate2').value = '';
       document.getElementById('compToDate2').value = '';
-      document.getElementById('compDashTrainFilter').value = '';
+      compDashSelectedTrains = [];
+      if (document.getElementById('compDashTrainSearch')) document.getElementById('compDashTrainSearch').value = '';
+      renderCompDashTrainMultiSelect('');
       document.getElementById('compDashStatusFilter').value = '';
       document.getElementById('compDashYardFilter').value = '';
       compChartFilter = { type: null, value: null };
@@ -9356,7 +9430,7 @@ function showPage(page) {
         rows.push(['P1 Date', `${document.getElementById('compFromDate1')?.value || '-'} to ${document.getElementById('compToDate1')?.value || '-'}`]);
         rows.push(['P2 Date', `${document.getElementById('compFromDate2')?.value || '-'} to ${document.getElementById('compToDate2')?.value || '-'}`]);
       }
-      rows.push(['Train', document.getElementById('compDashTrainFilter')?.value || 'All']);
+      rows.push(['Train', (compDashSelectedTrains || []).length ? compDashSelectedTrains.join(', ') : 'All']);
       rows.push(['Status', document.getElementById('compDashStatusFilter')?.value || 'All']);
       rows.push(['Yard', document.getElementById('compDashYardFilter')?.value || 'All']);
       const chartFilters = getActiveComplaintChartFilters();
