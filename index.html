@@ -180,6 +180,20 @@
     .detail-lines-table input { min-width: 90px; }
     .detail-lines-table .item-input { min-width: 180px; }
     .modal-wide { max-width: 860px; }
+    .modal-extra-wide { max-width: 1180px; }
+    .sales-item-picker { display: none; grid-template-columns: 220px 1fr; gap: 12px; margin-bottom: 14px; }
+    .sales-item-picker.active { display: grid; }
+    .sales-item-categories, .sales-item-products { border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; overflow: hidden; }
+    .sales-item-categories { max-height: 330px; overflow-y: auto; }
+    .sales-item-category { width: 100%; text-align: left; border: 0; background: transparent; padding: 9px 11px; cursor: pointer; color: #334155; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
+    .sales-item-category.active, .sales-item-category:hover { background: #e0f2fe; color: #0369a1; }
+    .sales-item-products { padding: 10px; }
+    .sales-item-product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; max-height: 280px; overflow-y: auto; margin-top: 8px; }
+    .sales-item-product { border: 1px solid #dbeafe; border-radius: 8px; background: #fff; padding: 9px; cursor: pointer; text-align: left; }
+    .sales-item-product:hover { border-color: #0ea5e9; background: #f0f9ff; }
+    .sales-item-product strong { display: block; color: #1e293b; font-size: 13px; margin-bottom: 4px; }
+    .sales-item-product span { display: block; color: #64748b; font-size: 11px; }
+    .sales-detail-help { color: #64748b; font-size: 12px; margin: -4px 0 10px; }
     .table-filter-row th { top: 35px; background: #fff; z-index: 3; padding: 6px; }
     .table-filter-row input, .table-filter-row select { width: 100%; min-width: 90px; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 11px; text-transform: none; }
     .master-values-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
@@ -1400,6 +1414,8 @@
                   <div class="amount-with-detail">
                     <input type="number" id="salesCashExpense" oninput="calculateSalesCostsAndGp()">
                     <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesDetailModal('cashExpense')" title="Add detail"><i class="fas fa-list"></i></button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('supportCashExpense').click()" title="Upload receipt"><i class="fas fa-camera"></i></button>
+                    <input type="file" id="supportCashExpense" accept="image/*" capture="environment" multiple style="display:none" onchange="handleSalesSupportUpload('cashExpense', this)">
                   </div>
                 </div>
                 <div class="form-field">
@@ -2403,6 +2419,85 @@
 
           <div class="card">
             <div class="card-header">
+              <div>
+                <h3 class="card-title">Item Rate Master</h3>
+                <p class="card-subtitle">Upload or maintain item rates used to build Total Sale from item quantity.</p>
+              </div>
+              <div class="action-btns">
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('itemRateImportFile').click()">
+                  <i class="fas fa-file-import"></i> Import Item Master
+                </button>
+                <input type="file" id="itemRateImportFile" accept=".xlsx,.xls" style="display:none" onchange="importItemRateMasterExcel(this)">
+                <button class="btn btn-ghost btn-sm" onclick="downloadItemRateMaster()">
+                  <i class="fas fa-file-excel"></i> Export Items
+                </button>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>Category</label>
+                <input type="text" id="itemRateCategory" placeholder="Example: Meals WCB">
+              </div>
+              <div class="form-field">
+                <label>Item Name *</label>
+                <input type="text" id="itemRateName" placeholder="Item name">
+              </div>
+              <div class="form-field">
+                <label>Train Type</label>
+                <select id="itemRateTrainType">
+                  <option>ALL</option>
+                  <option>WCB</option>
+                  <option>TSV</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label>Sale Rate *</label>
+                <input type="number" id="itemRateSaleRate" step="0.01" placeholder="Sale rate">
+              </div>
+              <div class="form-field">
+                <label>Purchase Rate</label>
+                <input type="number" id="itemRatePurchaseRate" step="0.01" placeholder="Purchase rate">
+              </div>
+              <div class="form-field">
+                <label>E-Catering Rate</label>
+                <input type="number" id="itemRateECateringRate" step="0.01" placeholder="E-Catering rate">
+              </div>
+              <div class="form-field">
+                <label>Active</label>
+                <select id="itemRateActive">
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:12px;">
+              <button class="btn btn-primary btn-sm" onclick="saveItemRateMaster()"><i class="fas fa-save"></i> Save Item</button>
+              <button class="btn btn-secondary btn-sm" onclick="clearItemRateMasterForm()"><i class="fas fa-undo"></i> Clear</button>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin:12px 0;">
+              <input id="itemRateSearch" placeholder="Search item/category/type..." oninput="loadItemRateMasterTable()" style="max-width:340px;">
+            </div>
+            <div class="table-container" style="max-height:420px;overflow:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Item</th>
+                    <th>Type</th>
+                    <th>Sale Rate</th>
+                    <th>Purchase Rate</th>
+                    <th>E-Catering Rate</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="itemRateMasterTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
               <h3 class="card-title">Train Manager Master List</h3>
               <div class="action-btns">
                 <button class="btn btn-danger btn-sm" onclick="deleteAllTrainMasters()">
@@ -2788,12 +2883,21 @@
 
   <!-- Sales amount detail modal -->
   <div id="salesDetailModal" class="modal-overlay">
-    <div class="modal modal-wide">
+    <div class="modal modal-extra-wide">
       <div class="modal-header">
         <h3 class="modal-title" id="salesDetailModalTitle">Amount Detail</h3>
         <button class="modal-close" onclick="closeSalesDetailModal()">&times;</button>
       </div>
+      <div id="salesItemPickerPanel" class="sales-item-picker">
+        <div class="sales-item-categories" id="salesItemCategoryList"></div>
+        <div class="sales-item-products">
+          <div class="sales-detail-help">Select category, search product, then click item to add. Click same item again to increase quantity.</div>
+          <input id="salesItemSearch" placeholder="Search product..." oninput="renderSalesItemPicker()" style="width:100%;">
+          <div class="sales-item-product-grid" id="salesItemProductGrid"></div>
+        </div>
+      </div>
       <div class="table-container">
+        <datalist id="salesItemMasterList"></datalist>
         <table class="detail-lines-table">
           <thead><tr><th>Item</th><th>Rate</th><th>Qty</th><th>Amount</th><th></th></tr></thead>
           <tbody id="salesDetailLinesBody"></tbody>
@@ -2982,6 +3086,7 @@ console.log("✅ Connected to NEW Firebase");
       rakeManagerHierarchy: {},
       trainMasters: [],
       targetMasters: [],
+      itemRateMasters: [],
       sales: [],
       complaints: [],
       cash: [],
@@ -3027,6 +3132,8 @@ console.log("✅ Connected to NEW Firebase");
     let compChartFilter = { type: null, value: null };
     let compChartFilters = [];
     let compDashSelectedTrains = [];
+    let itemRateEditingId = null;
+    let salesItemCategoryFilter = 'ALL';
     let pendingSalesEntry = null;
     let pendingSalesReopen = null;
     let salesCostDetails = {};
@@ -3221,6 +3328,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!appData.rakeManagerHierarchy) appData.rakeManagerHierarchy = DEFAULT_DATA.rakeManagerHierarchy;
       if (!appData.trainMasters) appData.trainMasters = DEFAULT_DATA.trainMasters;
       if (!appData.targetMasters) appData.targetMasters = [];
+      if (!appData.itemRateMasters) appData.itemRateMasters = [];
       if (!appData.sales) appData.sales = DEFAULT_DATA.sales;
       if (!appData.complaints) appData.complaints = DEFAULT_DATA.complaints;
       if (!appData.cash) appData.cash = DEFAULT_DATA.cash;
@@ -6662,7 +6770,8 @@ function showPage(page) {
     const SALES_SUPPORT_FIELDS = {
       storeBill: 'Store Bill',
       baseExpense: 'Base Expenses',
-      creditExpense: 'Credit Expenses'
+      creditExpense: 'Credit Expenses',
+      cashExpense: 'Cash Expenses'
     };
 
     function getMiscLimitAmount() {
@@ -6798,8 +6907,16 @@ function showPage(page) {
       if (field === 'miscExpense' && !salesCostDetails[field].length) {
         salesCostDetails[field] = JSON.parse(JSON.stringify(DEFAULT_MISC_EXPENSE_LINES));
       }
-      if (!salesCostDetails[field].length) salesCostDetails[field].push({ item: '', rate: 0, qty: 1, amount: 0 });
+      if (field !== 'totalSale' && !salesCostDetails[field].length) salesCostDetails[field].push({ item: '', rate: 0, qty: 1, amount: 0 });
       document.getElementById('salesDetailModalTitle').textContent = `${config.label} Detail`;
+      renderSalesItemMasterDatalist();
+      const picker = document.getElementById('salesItemPickerPanel');
+      if (picker) picker.classList.toggle('active', field === 'totalSale');
+      if (field === 'totalSale') {
+        salesItemCategoryFilter = 'ALL';
+        if (document.getElementById('salesItemSearch')) document.getElementById('salesItemSearch').value = '';
+        renderSalesItemPicker();
+      }
       renderSalesDetailLines();
       renderSalesSupportPreview(field);
       document.getElementById('salesDetailModal').classList.add('active');
@@ -6813,9 +6930,10 @@ function showPage(page) {
     function renderSalesDetailLines() {
       const rows = salesCostDetails[currentSalesDetailField] || [];
       const tbody = document.getElementById('salesDetailLinesBody');
+      const useItemMaster = currentSalesDetailField === 'totalSale';
       tbody.innerHTML = rows.map((line, index) => `
         <tr>
-          <td><input class="item-input" value="${line.item || ''}" oninput="updateSalesDetailLine(${index}, 'item', this.value)"></td>
+          <td><input class="item-input" ${useItemMaster ? 'list="salesItemMasterList"' : ''} value="${escapeHtml(line.item || '')}" oninput="updateSalesDetailLine(${index}, 'item', this.value)" placeholder="${useItemMaster ? 'Search item master...' : 'Item'}"></td>
           <td><input type="number" value="${Number(line.rate) || 0}" oninput="updateSalesDetailLine(${index}, 'rate', this.value)"></td>
           <td><input type="number" value="${Number(line.qty) || 0}" oninput="updateSalesDetailLine(${index}, 'qty', this.value)"></td>
           <td><input type="number" value="${Number(line.amount) || 0}" oninput="updateSalesDetailLine(${index}, 'amount', this.value)"></td>
@@ -6825,10 +6943,84 @@ function showPage(page) {
       document.getElementById('salesDetailTotal').textContent = formatCurrency(getSalesDetailTotal(currentSalesDetailField));
     }
 
+    function renderSalesItemMasterDatalist() {
+      const list = document.getElementById('salesItemMasterList');
+      if (!list) return;
+      list.innerHTML = getAvailableSalesItemRates().map(item => `<option value="${escapeHtml(item.itemName || '')}" label="${escapeHtml(`${item.category || 'Item'} | ${item.trainType || 'ALL'} | ${formatCurrency(item.saleRate || 0)}`)}"></option>`).join('');
+    }
+
+    function renderSalesItemPicker() {
+      const categoryBox = document.getElementById('salesItemCategoryList');
+      const productGrid = document.getElementById('salesItemProductGrid');
+      if (!categoryBox || !productGrid) return;
+      const items = getAvailableSalesItemRates();
+      const categories = ['ALL', ...new Set(items.map(item => item.category || 'Uncategorized'))].sort((a, b) => a === 'ALL' ? -1 : b === 'ALL' ? 1 : a.localeCompare(b));
+      if (!categories.includes(salesItemCategoryFilter)) salesItemCategoryFilter = 'ALL';
+      categoryBox.innerHTML = categories.map(category => `
+        <button type="button" class="sales-item-category ${category === salesItemCategoryFilter ? 'active' : ''}" onclick="selectSalesItemCategory('${encodeURIComponent(category)}')">
+          ${escapeHtml(category)}${category === 'ALL' ? ` (${items.length})` : ''}
+        </button>
+      `).join('');
+      const query = normalizeText(document.getElementById('salesItemSearch')?.value || '');
+      const filtered = items.filter(item =>
+        (salesItemCategoryFilter === 'ALL' || (item.category || 'Uncategorized') === salesItemCategoryFilter) &&
+        (!query || normalizeText(`${item.itemName || ''} ${item.category || ''} ${item.trainType || ''}`).includes(query))
+      );
+      productGrid.innerHTML = filtered.length ? filtered.map(item => `
+        <button type="button" class="sales-item-product" onclick="addSalesItemFromMaster('${item.id}')">
+          <strong>${escapeHtml(item.itemName || '')}</strong>
+          <span>${escapeHtml(item.category || 'Uncategorized')} | ${escapeHtml(item.trainType || 'ALL')}</span>
+          <span>Sale Rate: ${formatCurrency(item.saleRate || 0)}</span>
+        </button>
+      `).join('') : '<div style="color:#64748b;padding:12px;">No item found for this category/search.</div>';
+    }
+
+    function selectSalesItemCategory(encodedCategory) {
+      salesItemCategoryFilter = decodeURIComponent(encodedCategory || 'ALL');
+      renderSalesItemPicker();
+    }
+
+    function addSalesItemFromMaster(id) {
+      const item = (appData.itemRateMasters || []).find(row => String(row.id) === String(id));
+      if (!item) return;
+      if (!salesCostDetails.totalSale) salesCostDetails.totalSale = [];
+      const existing = salesCostDetails.totalSale.find(line => normalizeText(line.item) === normalizeText(item.itemName) && Number(line.rate) === Number(item.saleRate || 0));
+      if (existing) {
+        existing.qty = (Number(existing.qty) || 0) + 1;
+        existing.amount = Math.round((Number(existing.rate) || 0) * (Number(existing.qty) || 0));
+      } else {
+        salesCostDetails.totalSale.push({
+          item: item.itemName || '',
+          category: item.category || '',
+          trainType: item.trainType || 'ALL',
+          rate: Number(item.saleRate) || 0,
+          purchaseRate: Number(item.purchaseRate) || 0,
+          eCateringRate: Number(item.eCateringRate) || 0,
+          qty: 1,
+          amount: Math.round(Number(item.saleRate) || 0)
+        });
+      }
+      renderSalesDetailLines();
+    }
+
     function updateSalesDetailLine(index, key, value) {
       const rows = salesCostDetails[currentSalesDetailField] || [];
       if (!rows[index]) return;
       rows[index][key] = key === 'item' ? value : Number(value) || 0;
+      if (currentSalesDetailField === 'totalSale' && key === 'item') {
+        const masterItem = getItemRateByName(value);
+        if (masterItem) {
+          rows[index].category = masterItem.category || '';
+          rows[index].trainType = masterItem.trainType || 'ALL';
+          rows[index].purchaseRate = Number(masterItem.purchaseRate) || 0;
+          rows[index].eCateringRate = Number(masterItem.eCateringRate) || 0;
+          rows[index].rate = Number(masterItem.saleRate) || 0;
+          rows[index].amount = Math.round((Number(rows[index].rate) || 0) * (Number(rows[index].qty) || 0));
+          const inputs = document.querySelectorAll('#salesDetailLinesBody tr')[index]?.querySelectorAll('input');
+          if (inputs?.[1]) inputs[1].value = rows[index].rate;
+          if (inputs?.[3]) inputs[3].value = rows[index].amount;
+        }
+      }
       if (key === 'rate' || key === 'qty') {
         rows[index].amount = Math.round((Number(rows[index].rate) || 0) * (Number(rows[index].qty) || 0));
         const amountInput = document.querySelectorAll('#salesDetailLinesBody tr')[index]?.querySelectorAll('input')[3];
@@ -6851,6 +7043,12 @@ function showPage(page) {
 
     function getSalesDetailTotal(field) {
       return (salesCostDetails[field] || []).reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
+    }
+
+    function getTotalSaleDetailDifference() {
+      const detailTotal = Math.round(getSalesDetailTotal('totalSale'));
+      const enteredTotal = Math.round(Number(document.getElementById('salesAchievement')?.value) || 0);
+      return { detailTotal, enteredTotal, difference: enteredTotal - detailTotal };
     }
 
     function applySalesDetailModal() {
@@ -7093,6 +7291,10 @@ function showPage(page) {
       if (miscDifference !== 0) {
         showAlert(`MISC Expenses differs from 1% auto amount by ${miscDifference > 0 ? '+' : '-'}${formatCurrency(Math.abs(miscDifference))}. Manual amount will be saved.`, 'warning');
       }
+      const saleDetailCheck = getTotalSaleDetailDifference();
+      if (saleDetailCheck.detailTotal > 0 && saleDetailCheck.difference !== 0) {
+        showAlert(`Total Sale differs from item detail total by ${saleDetailCheck.difference > 0 ? '+' : '-'}${formatCurrency(Math.abs(saleDetailCheck.difference))}. Manual Total Sale will be saved.`, 'warning');
+      }
 
       const entry = {
         id: editingId || Date.now(),
@@ -7116,6 +7318,9 @@ function showPage(page) {
         salesTarget: getTrainSalesTarget(train.trainNumber, train.trainName, date),
         salesAchievement: Math.round(Number(salesAchievement)),
         totalSale: Math.round(Number(salesAchievement)),
+        itemSaleDetailTotal: saleDetailCheck.detailTotal,
+        itemSaleDifference: saleDetailCheck.detailTotal > 0 ? saleDetailCheck.difference : 0,
+        itemSaleWarning: saleDetailCheck.detailTotal > 0 && saleDetailCheck.difference !== 0,
         storeBill: Math.round(salesCosts.storeBill),
         baseExpense: Math.round(salesCosts.baseExpense),
         creditExpense: Math.round(salesCosts.creditExpense),
@@ -7952,12 +8157,137 @@ function showPage(page) {
       
       updateMasterTargetDisplay();
       loadTargetMasterTable();
+      loadItemRateMasterTable();
       
       const hasData = appData.trainMasters && appData.trainMasters.length > 0;
       document.getElementById('noMasterDataWarning').classList.toggle('hidden', hasData);
       
       loadMasterTable();
       loadMasterAuditLog();
+    }
+
+    function inferItemTrainType(category, itemName) {
+      const text = normalizeText(`${category || ''} ${itemName || ''}`);
+      if (text.includes('tsv')) return 'TSV';
+      if (text.includes('wcb')) return 'WCB';
+      return 'ALL';
+    }
+
+    function getItemRateKey(item) {
+      return `${normalizeText(item.trainType || 'ALL')}|${normalizeText(item.category || '')}|${normalizeText(item.itemName || '')}`;
+    }
+
+    function findExistingItemRateMaster(item) {
+      const key = getItemRateKey(item);
+      return (appData.itemRateMasters || []).find(row => getItemRateKey(row) === key);
+    }
+
+    function clearItemRateMasterForm() {
+      itemRateEditingId = null;
+      ['itemRateCategory', 'itemRateName', 'itemRateSaleRate', 'itemRatePurchaseRate', 'itemRateECateringRate'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      if (document.getElementById('itemRateTrainType')) document.getElementById('itemRateTrainType').value = 'ALL';
+      if (document.getElementById('itemRateActive')) document.getElementById('itemRateActive').value = 'true';
+    }
+
+    function saveItemRateMaster() {
+      if (!ensureEditable('save item rate master')) return;
+      const item = {
+        id: itemRateEditingId || Date.now() + Math.random(),
+        category: document.getElementById('itemRateCategory')?.value.trim() || '',
+        itemName: document.getElementById('itemRateName')?.value.trim() || '',
+        trainType: document.getElementById('itemRateTrainType')?.value || 'ALL',
+        saleRate: Number(document.getElementById('itemRateSaleRate')?.value) || 0,
+        purchaseRate: Number(document.getElementById('itemRatePurchaseRate')?.value) || 0,
+        eCateringRate: Number(document.getElementById('itemRateECateringRate')?.value) || 0,
+        active: document.getElementById('itemRateActive')?.value !== 'false'
+      };
+      if (!item.itemName || !item.saleRate) {
+        showAlert('Please enter item name and sale rate.', 'error');
+        return;
+      }
+      const existing = findExistingItemRateMaster(item);
+      if (existing && String(existing.id) !== String(item.id)) {
+        if (!confirm('Item already exists for same train type, category and item name. Update existing item rate?')) return;
+        item.id = existing.id;
+      }
+      const index = (appData.itemRateMasters || []).findIndex(row => String(row.id) === String(item.id));
+      if (index >= 0) appData.itemRateMasters[index] = item;
+      else appData.itemRateMasters.push(item);
+      addMasterLog(itemRateEditingId ? 'Edit Item Rate Master' : 'Add Item Rate Master', item, 'Item rate master saved');
+      saveData();
+      clearItemRateMasterForm();
+      loadItemRateMasterTable();
+      showAlert('Item rate saved successfully', 'success');
+    }
+
+    function loadItemRateMasterTable() {
+      const tbody = document.getElementById('itemRateMasterTableBody');
+      if (!tbody) return;
+      const canEdit = currentUser && (currentUser.role === 'admin' || currentUser.role === 'super_admin');
+      const search = normalizeText(document.getElementById('itemRateSearch')?.value || '');
+      const rows = [...(appData.itemRateMasters || [])]
+        .filter(item => !search || [item.category, item.itemName, item.trainType, item.saleRate, item.purchaseRate, item.eCateringRate].some(v => normalizeText(v).includes(search)))
+        .sort((a, b) => String(a.trainType || '').localeCompare(String(b.trainType || '')) || String(a.category || '').localeCompare(String(b.category || '')) || String(a.itemName || '').localeCompare(String(b.itemName || '')));
+      tbody.innerHTML = rows.length ? rows.map(item => `
+        <tr>
+          <td>${escapeHtml(item.category || '-')}</td>
+          <td>${escapeHtml(item.itemName || '-')}</td>
+          <td>${escapeHtml(item.trainType || 'ALL')}</td>
+          <td>${formatCurrency(item.saleRate || 0)}</td>
+          <td>${formatCurrency(item.purchaseRate || 0)}</td>
+          <td>${formatCurrency(item.eCateringRate || 0)}</td>
+          <td>${item.active === false ? 'Inactive' : 'Active'}</td>
+          <td>${canEdit ? `<button class="btn-icon edit" onclick="editItemRateMaster('${item.id}')"><i class="fas fa-edit"></i></button><button class="btn-icon delete" onclick="deleteItemRateMaster('${item.id}')"><i class="fas fa-trash"></i></button>` : '<span style="font-size:11px;color:#64748b;">View</span>'}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="8" style="text-align:center;color:#64748b;">No item rate master uploaded.</td></tr>';
+    }
+
+    function editItemRateMaster(id) {
+      const item = (appData.itemRateMasters || []).find(row => String(row.id) === String(id));
+      if (!item) return;
+      itemRateEditingId = item.id;
+      document.getElementById('itemRateCategory').value = item.category || '';
+      document.getElementById('itemRateName').value = item.itemName || '';
+      document.getElementById('itemRateTrainType').value = item.trainType || 'ALL';
+      document.getElementById('itemRateSaleRate').value = item.saleRate || '';
+      document.getElementById('itemRatePurchaseRate').value = item.purchaseRate || '';
+      document.getElementById('itemRateECateringRate').value = item.eCateringRate || '';
+      document.getElementById('itemRateActive').value = item.active === false ? 'false' : 'true';
+      document.getElementById('itemRateName').focus();
+    }
+
+    function deleteItemRateMaster(id) {
+      if (!ensureEditable('delete item rate master')) return;
+      const item = (appData.itemRateMasters || []).find(row => String(row.id) === String(id));
+      if (!item) return;
+      if (!confirm(`Delete item rate?\n\n${item.itemName || ''}`)) return;
+      markRecordDeleted('itemRateMasters', item.id);
+      markRecordDeleted('itemRateMasters', makeRecordKey(item, 'itemRateMasters'));
+      appData.itemRateMasters = (appData.itemRateMasters || []).filter(row => String(row.id) !== String(id));
+      addMasterLog('Delete Item Rate Master', item, 'Item rate master deleted');
+      saveData({ forceOverwrite: true });
+      if (String(itemRateEditingId) === String(id)) clearItemRateMasterForm();
+      loadItemRateMasterTable();
+      showAlert('Item rate deleted', 'success');
+    }
+
+    function getAvailableSalesItemRates() {
+      const trainType = normalizeText(document.getElementById('salesTrainType')?.value || '');
+      return (appData.itemRateMasters || []).filter(item => {
+        if (item.active === false) return false;
+        const itemType = normalizeText(item.trainType || 'ALL');
+        if (!trainType || !['wcb', 'tsv'].includes(trainType)) return true;
+        return itemType === 'all' || itemType === trainType;
+      }).sort((a, b) => String(a.category || '').localeCompare(String(b.category || '')) || String(a.itemName || '').localeCompare(String(b.itemName || '')));
+    }
+
+    function getItemRateByName(itemName) {
+      const key = normalizeText(itemName);
+      if (!key) return null;
+      return getAvailableSalesItemRates().find(item => normalizeText(item.itemName) === key) || null;
     }
 
     function updateMasterTargetDisplay() {
@@ -9046,6 +9376,61 @@ function showPage(page) {
       } catch (error) { showAlert('Import failed: ' + error.message, 'error'); }
     }
 
+    async function importItemRateMasterExcel(input) {
+      if (!ensureEditable('import item rate master')) { input.value = ''; return; }
+      const file = input.files[0];
+      if (!file) return;
+
+      try {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const rows = getRowsFromWorkbookByHeaders(workbook, ['ITEMS', 'RATE']);
+        let imported = 0;
+        let skipped = 0;
+        let overwriteAll = null;
+
+        rows.forEach(row => {
+          const itemName = String(getColumnValue(row, ['ITEMS', 'Item', 'Item Name', 'itemName']) || '').trim();
+          if (!itemName || normalizeText(itemName) === normalizeText('ITEMS')) { skipped++; return; }
+          const category = String(getColumnValue(row, ['Items Description', 'Item Description', 'Category', 'category']) || '').trim();
+          const explicitTrainType = String(getColumnValue(row, ['Train Type', 'trainType']) || '').trim().toUpperCase();
+          const saleRate = Number(getColumnValue(row, ['RATE', 'Sale Rate', 'saleRate'])) || 0;
+          const purchaseRate = Number(getColumnValue(row, ['PUR RATE', 'Purchase Rate', 'purchaseRate'])) || 0;
+          const eCateringRate = Number(getColumnValue(row, ['Ecatering', 'E-Catering', 'E Catering', 'eCateringRate'])) || 0;
+          const activeValue = String(getColumnValue(row, ['Active', 'Status', 'active']) || 'Yes').trim().toLowerCase();
+          if (!saleRate && !purchaseRate && !eCateringRate) { skipped++; return; }
+          const item = {
+            id: Date.now() + Math.random(),
+            category,
+            itemName,
+            trainType: ['WCB', 'TSV', 'ALL'].includes(explicitTrainType) ? explicitTrainType : inferItemTrainType(category, itemName),
+            saleRate,
+            purchaseRate,
+            eCateringRate,
+            active: !['no', 'false', 'inactive', '0'].includes(activeValue)
+          };
+          const existing = findExistingItemRateMaster(item);
+          if (existing) {
+            if (overwriteAll === null) overwriteAll = confirm('Item Rate Master already has matching item rows. Update matching rates from this upload?');
+            if (!overwriteAll) { skipped++; return; }
+            const index = appData.itemRateMasters.findIndex(row => String(row.id) === String(existing.id));
+            if (index >= 0) appData.itemRateMasters[index] = { ...existing, ...item, id: existing.id };
+          } else {
+            appData.itemRateMasters.push(item);
+          }
+          imported++;
+        });
+
+        addMasterLog('Import Item Rate Master', {}, `${imported} item rate rows imported/updated, ${skipped} skipped`);
+        saveData();
+        input.value = '';
+        loadItemRateMasterTable();
+        showAlert(`${imported} item rates imported/updated successfully, ${skipped} skipped`, 'success');
+      } catch (error) {
+        showAlert('Item Rate Master import failed: ' + error.message, 'error');
+      }
+    }
+
     function normalizeColumnKey(name) {
       return String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     }
@@ -9318,6 +9703,9 @@ function showPage(page) {
         'Rake Manager Phone': getRakeManagerPhoneFromEntry(s),
         'Sales Target': s.salesTarget || 0,
         'Total Sale': s.salesAchievement || s.totalSale || 0,
+        'Item Detail Total': s.itemSaleDetailTotal || 0,
+        'Item Detail Difference': s.itemSaleDifference || 0,
+        'Item Detail Warning': s.itemSaleWarning ? 'Yes' : 'No',
         'Store Bill': s.storeBill || 0,
         'Base Expenses': s.baseExpense || 0,
         'Credit Expenses': s.creditExpense || 0,
@@ -9330,6 +9718,7 @@ function showPage(page) {
         'Store Bill Supporting': (s.supportingFiles?.storeBill || []).map(f => f.name).join(', '),
         'Base Expenses Supporting': (s.supportingFiles?.baseExpense || []).map(f => f.name).join(', '),
         'Credit Expenses Supporting': (s.supportingFiles?.creditExpense || []).map(f => f.name).join(', '),
+        'Cash Expenses Supporting': (s.supportingFiles?.cashExpense || []).map(f => f.name).join(', '),
         Commission: s.cashCommission || 0,
         'Staff Salary': s.staffSalary || 0,
         'Rake Manager Salary': s.managerSalary || 0,
@@ -9372,6 +9761,18 @@ function showPage(page) {
     }
 
     function downloadMasterData() { downloadExcel(appData.trainMasters, 'train_master_export.xlsx'); }
+    function downloadItemRateMaster() {
+      const rows = (appData.itemRateMasters || []).map(item => ({
+        Category: item.category || '',
+        'Item Name': item.itemName || '',
+        'Train Type': item.trainType || 'ALL',
+        'Sale Rate': item.saleRate || 0,
+        'Purchase Rate': item.purchaseRate || 0,
+        'E-Catering Rate': item.eCateringRate || 0,
+        Active: item.active === false ? 'No' : 'Yes'
+      }));
+      downloadExcel(rows, 'item_rate_master_export.xlsx');
+    }
     function downloadSalesDashboardExcel() { downloadExcel(getFilteredSales(1), `sales_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); }
     function downloadComplaintDashboardExcel() { downloadExcel(getFilteredComplaints(1).map(formatComplaintExportRow), `complaint_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); }
     function getPdfLib() {
@@ -9567,9 +9968,22 @@ function showPage(page) {
         y = addPdfSectionTitle(doc, title, y);
         doc.autoTable({
           startY: y,
-          head: [['Date', 'Train', 'No', 'Yard', 'Train Manager', 'Rake Manager', 'Target', 'Sale', 'GP', 'Salary', 'Support']],
-          body: rows.map(r => [formatDate(r.date), r.trainName || '-', r.trainNumber || '-', r.yard || '-', r.trainManager || '-', r.rakeManager || '-', pdfMoney(r.salesTarget), pdfMoney(r.salesAchievement || r.totalSale), pdfMoney(r.gpAchievement), pdfMoney(r.managerSalary), getSalesSupportCount(r)]),
-          styles: { fontSize: 6.5, cellPadding: 1.2, overflow: 'linebreak' },
+          head: [['Date', 'Train', 'No', 'Yard', 'Train Manager', 'Rake Manager', 'Target', 'Sale', 'GP', 'Salary', 'Support', 'Support Files']],
+          body: rows.map(r => [
+            formatDate(r.date),
+            r.trainName || '-',
+            r.trainNumber || '-',
+            r.yard || '-',
+            r.trainManager || '-',
+            r.rakeManager || '-',
+            pdfMoney(r.salesTarget),
+            pdfMoney(r.salesAchievement || r.totalSale),
+            pdfMoney(r.gpAchievement),
+            pdfMoney(r.managerSalary),
+            getSalesSupportCount(r),
+            Object.entries(r.supportingFiles || {}).flatMap(([field, files]) => (files || []).map(file => `${SALES_SUPPORT_FIELDS[field] || field}: ${file.name || 'image'}`)).join(', ') || '-'
+          ]),
+          styles: { fontSize: 5.8, cellPadding: 1, overflow: 'linebreak' },
           headStyles: { fillColor: [2, 132, 199] },
           margin: { left: 14, right: 14 }
         });
@@ -9914,6 +10328,7 @@ function showPage(page) {
         rakeManagerHierarchy: source.rakeManagerHierarchy || {},
         trainMasters: source.trainMasters || [],
         targetMasters: source.targetMasters || [],
+        itemRateMasters: source.itemRateMasters || [],
         sales: source.sales || [],
         complaints: source.complaints || [],
         cash: source.cash || [],
@@ -9933,6 +10348,7 @@ function showPage(page) {
         rakeManagerHierarchy: { ...(cloudData.rakeManagerHierarchy || {}), ...(localData.rakeManagerHierarchy || {}) },
         trainMasters: mergeArrayByKey(cloudData.trainMasters, localData.trainMasters, getDeletedSet('trainMasters', cloudData, localData)),
         targetMasters: mergeArrayByKey(cloudData.targetMasters, localData.targetMasters, getDeletedSet('targetMasters', cloudData, localData)),
+        itemRateMasters: mergeArrayByKey(cloudData.itemRateMasters, localData.itemRateMasters, getDeletedSet('itemRateMasters', cloudData, localData)),
         sales: mergeArrayByKey(cloudData.sales, localData.sales, getDeletedSet('sales', cloudData, localData)),
         complaints: mergeArrayByKey(cloudData.complaints, localData.complaints, getDeletedSet('complaints', cloudData, localData)),
         cash: mergeArrayByKey(cloudData.cash, localData.cash, getDeletedSet('cash', cloudData, localData)),
@@ -10029,6 +10445,15 @@ function showPage(page) {
     window.editCashEntry = editCashEntry;
     window.deleteCashEntry = deleteCashEntry;
     window.saveTrainMaster = saveTrainMaster;
+    window.saveItemRateMaster = saveItemRateMaster;
+    window.clearItemRateMasterForm = clearItemRateMasterForm;
+    window.editItemRateMaster = editItemRateMaster;
+    window.deleteItemRateMaster = deleteItemRateMaster;
+    window.importItemRateMasterExcel = importItemRateMasterExcel;
+    window.downloadItemRateMaster = downloadItemRateMaster;
+    window.renderSalesItemPicker = renderSalesItemPicker;
+    window.selectSalesItemCategory = selectSalesItemCategory;
+    window.addSalesItemFromMaster = addSalesItemFromMaster;
     window.importSalesGpTargetExcel = importSalesGpTargetExcel;
     window.deleteAllSalesData = deleteAllSalesData;
     window.deleteAllComplaintData = deleteAllComplaintData;
