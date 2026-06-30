@@ -162,7 +162,12 @@
     .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .rake-summary-scroll { overflow-x: auto; max-height: 515px; overflow-y: auto; scrollbar-gutter: stable; }
     .rank-table-scroll { overflow-x: auto; max-height: 515px; overflow-y: auto; scrollbar-gutter: stable; }
-    .pending-deposit-scroll { overflow-x: auto; max-height: 515px; overflow-y: auto; scrollbar-gutter: stable; }
+    .pending-deposit-scroll { overflow-x: auto; max-height: 660px; overflow-y: auto; scrollbar-gutter: stable; }
+    .cash-summary-scroll { overflow-x: auto; max-height: 660px; overflow-y: auto; scrollbar-gutter: stable; }
+    .cash-summary-scroll thead th,
+    .pending-deposit-scroll thead th { position: sticky; top: 0; z-index: 2; }
+    .cash-summary-scroll .table-total-row td,
+    .pending-deposit-scroll .table-total-row td { background: #f8fafc !important; font-weight: 700; position: sticky; top: 35px; z-index: 1; }
     #trainManagerSalesSummaryTable { min-width: 1450px; }
     #trainManagerSalesSummaryTable thead,
     #trainManagerSalesSummaryTable tbody tr { display: table; width: 100%; table-layout: fixed; }
@@ -1893,7 +1898,7 @@
             <div class="kpi-card info">
               <div class="kpi-label">Total Sale To Collect</div>
               <div class="kpi-value" id="cashKpiGpCollected">₹0</div>
-              <div class="kpi-sub">From selected cash entries</div>
+              <div class="kpi-sub">From selected sales entries</div>
             </div>
             <div class="kpi-card success">
               <div class="kpi-label">Total Deposit</div>
@@ -1946,7 +1951,7 @@
                 <i class="fas fa-file-excel"></i>
               </button>
             </div>
-            <div class="table-container">
+            <div class="table-container cash-summary-scroll">
               <table id="cashCollectionTable">
                 <thead>
                   <tr>
@@ -2013,11 +2018,13 @@
                     <th>Rake Manager</th>
                     <th>Train Manager</th>
                     <th>Train</th>
+                    <th>Train Number</th>
                     <th>Rake Number</th>
                     <th>Date</th>
-                    <th>Total Sale</th>
+                    <th>Amount To Collect</th>
                     <th>Total Deposited</th>
                     <th>Amount Pending</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody id="pendingDepositTableBody"></tbody>
@@ -2046,6 +2053,7 @@
             <div class="tabs">
               <button class="tab active" onclick="switchCashTab('entry')">New Entry</button>
               <button class="tab" onclick="switchCashTab('list')">View Entries</button>
+              <button class="tab" onclick="switchCashTab('bank')">Bank Deposit</button>
             </div>
 
             <div id="cashEntryTab">
@@ -2189,6 +2197,57 @@
                     </tr>
                   </thead>
                   <tbody id="cashTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="cashBankTab" class="hidden">
+              <div class="form-row">
+                <div class="form-field">
+                  <label>Bank Deposit Date *</label>
+                  <input type="date" id="bankDepositDate">
+                </div>
+                <div class="form-field">
+                  <label>Cash Collection Date</label>
+                  <input type="date" id="bankCollectionDate">
+                </div>
+                <div class="form-field">
+                  <label>Bank Deposit Amount *</label>
+                  <input type="number" id="bankDepositAmount">
+                </div>
+                <div class="form-field">
+                  <label>Bank Receipt Photo</label>
+                  <button type="button" class="btn btn-ghost" onclick="document.getElementById('bankReceiptFile').click()">
+                    <i class="fas fa-camera"></i> Upload Receipt
+                  </button>
+                  <input type="file" id="bankReceiptFile" accept="image/*" capture="environment" multiple style="display:none" onchange="handleBankReceiptUpload(this)">
+                </div>
+              </div>
+              <div id="bankReceiptPreview" style="margin-bottom:12px;color:#64748b;"></div>
+              <div class="form-row">
+                <div class="form-field" style="grid-column: 1 / -1;">
+                  <label>Remarks</label>
+                  <textarea id="bankDepositRemarks" rows="2"></textarea>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;margin-bottom:16px;">
+                <button class="btn btn-primary" onclick="saveBankDepositEntry()"><i class="fas fa-save"></i> Save Bank Deposit</button>
+                <button class="btn btn-secondary" onclick="clearBankDepositForm()"><i class="fas fa-undo"></i> Clear</button>
+                <button class="btn btn-success" onclick="downloadBankDepositEntries()"><i class="fas fa-file-excel"></i> Download Bank Deposit</button>
+              </div>
+              <div class="table-container cash-summary-scroll">
+                <table id="bankDepositTable">
+                  <thead>
+                    <tr>
+                      <th>Deposit Date</th>
+                      <th>Collection Date</th>
+                      <th>Amount</th>
+                      <th>Receipt</th>
+                      <th>Remarks</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bankDepositTableBody"></tbody>
                 </table>
               </div>
             </div>
@@ -3091,6 +3150,7 @@ console.log("✅ Connected to NEW Firebase");
       sales: [],
       complaints: [],
       cash: [],
+      bankDeposits: [],
       masterLogs: []
     };
 
@@ -3141,6 +3201,7 @@ console.log("✅ Connected to NEW Firebase");
     let salesSalaryDetails = [];
     let currentSalesDetailField = '';
     let salesSupportFiles = {};
+    let bankReceiptFiles = [];
     let salesMiscManual = false;
     const MASTER_DELETE_KEY = 'RKRESET2026';
     const noDataPopupShown = { sales: false, complaints: false, cash: false };
@@ -3333,6 +3394,7 @@ console.log("✅ Connected to NEW Firebase");
       if (!appData.sales) appData.sales = DEFAULT_DATA.sales;
       if (!appData.complaints) appData.complaints = DEFAULT_DATA.complaints;
       if (!appData.cash) appData.cash = DEFAULT_DATA.cash;
+      if (!appData.bankDeposits) appData.bankDeposits = [];
       if (!appData.masterLogs) appData.masterLogs = [];
       if (!appData.deletedRecords) appData.deletedRecords = {};
       if (!appData.users) appData.users = DEFAULT_DATA.users;
@@ -6179,18 +6241,13 @@ function showPage(page) {
       if (yardFilter) { cashData = cashData.filter(c => c.yard === yardFilter); salesData = salesData.filter(s => s.yard === yardFilter); }
       if (managerFilter) { cashData = cashData.filter(c => getCashEntryManager(c) === managerFilter); salesData = salesData.filter(s => s.trainManager === managerFilter); }
 
-      const collectFromCashEntries = sumUniqueCashCollectable(cashData);
       const collectFromSalesEntries = salesData.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
-      const gpCollected = cashData.length ? collectFromCashEntries : collectFromSalesEntries;
+      const gpCollected = collectFromSalesEntries;
       const totalDeposit = cashData.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
       const cashCounter = cashData.reduce((sum, c) => sum + (Number(c.cashDepositCounter) || 0), 0);
       const onlineDeposit = cashData.reduce((sum, c) => sum + (Number(c.onlineDeposit) || 0), 0);
       const difference = gpCollected - totalDeposit;
-      const pendingShortage = cashData.filter(c => {
-        const amountToCollect = getCashCollectableAmount(c);
-        const deposit = Number(c.totalDeposit) || 0;
-        return amountToCollect > 0 && deposit < amountToCollect;
-      }).length;
+      const pendingShortage = salesData.filter(s => getPendingAmountForSalesEntry(s) > 0).length;
 
       document.getElementById('cashKpiGpCollected').textContent = formatCurrency(gpCollected);
       document.getElementById('cashKpiTotalDeposit').textContent = formatCurrency(totalDeposit);
@@ -6256,6 +6313,19 @@ function showPage(page) {
       return Number(sale?.amountToCollect || sale?.salesAchievement || sale?.totalSale) || 0;
     }
 
+    function getDepositedAmountForSalesEntry(sale, excludeCashId = null) {
+      if (!sale) return 0;
+      return (appData.cash || [])
+        .filter(c => String(c.id) !== String(excludeCashId || '') && isSameTrainForCashSale(c, sale))
+        .reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
+    }
+
+    function getPendingAmountForSalesEntry(sale, excludeCashId = null) {
+      const amountToCollect = getSaleCollectableAmount(sale);
+      const deposited = getDepositedAmountForSalesEntry(sale, excludeCashId);
+      return Math.max(amountToCollect - deposited, 0);
+    }
+
     function getCashCollectableAmount(cashEntry) {
       return Number(cashEntry?.amountToCollect || cashEntry?.gpFromSales || cashEntry?.gpCollected) || 0;
     }
@@ -6292,9 +6362,7 @@ function showPage(page) {
       const rows = dates.map(date => {
         const daySales = (salesData || []).filter(s => getSalesCashDate(s) === date);
         const dayCash = (cashData || []).filter(c => getCashEntryDate(c) === date);
-        const amountToCollect = dayCash.length
-          ? sumUniqueCashCollectable(dayCash)
-          : daySales.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
+        const amountToCollect = daySales.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
         const cashDeposit = dayCash.reduce((sum, c) => sum + (Number(c.cashDepositCounter) || 0), 0);
         const onlineDeposit = dayCash.reduce((sum, c) => sum + (Number(c.onlineDeposit) || 0), 0);
         const totalDeposit = dayCash.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
@@ -6311,7 +6379,33 @@ function showPage(page) {
         return { date, salesCount: daySales.length, cashCount: dayCash.length, amountToCollect, cashDeposit, onlineDeposit, totalDeposit, pendingNoDeposit, pendingShort, totalPending: pendingNoDeposit + pendingShort };
       }).sort((a, b) => b.date.localeCompare(a.date));
 
-      tbody.innerHTML = rows.length ? rows.map(r => `
+      const totals = rows.reduce((acc, r) => {
+        acc.salesCount += r.salesCount;
+        acc.cashCount += r.cashCount;
+        acc.amountToCollect += r.amountToCollect;
+        acc.cashDeposit += r.cashDeposit;
+        acc.onlineDeposit += r.onlineDeposit;
+        acc.totalDeposit += r.totalDeposit;
+        acc.pendingNoDeposit += r.pendingNoDeposit;
+        acc.pendingShort += r.pendingShort;
+        acc.totalPending += r.totalPending;
+        return acc;
+      }, { salesCount: 0, cashCount: 0, amountToCollect: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0, pendingNoDeposit: 0, pendingShort: 0, totalPending: 0 });
+
+      tbody.innerHTML = rows.length ? `
+        <tr class="table-total-row">
+          <td><strong>Total</strong></td>
+          <td><strong>${totals.salesCount}</strong></td>
+          <td><strong>${totals.cashCount}</strong></td>
+          <td><strong>${formatCurrency(totals.amountToCollect)}</strong></td>
+          <td><strong>${formatCurrency(totals.cashDeposit)}</strong></td>
+          <td><strong>${formatCurrency(totals.onlineDeposit)}</strong></td>
+          <td><strong>${formatCurrency(totals.totalDeposit)}</strong></td>
+          <td><strong>${formatCurrency(totals.pendingNoDeposit)}</strong></td>
+          <td><strong>${formatCurrency(totals.pendingShort)}</strong></td>
+          <td><strong>${formatCurrency(totals.totalPending)}</strong></td>
+        </tr>
+      ` + rows.map(r => `
         <tr>
           <td>${formatDate(r.date)}</td>
           <td>${r.salesCount}</td>
@@ -6329,9 +6423,8 @@ function showPage(page) {
 
     function renderManagerCashTable(cashData, salesData) {
       const managerMap = {};
-      const managerCollectKeys = {};
       
-      if (!(cashData || []).length) salesData.forEach(s => {
+      salesData.forEach(s => {
         const manager = s.trainManager || 'Unassigned';
         if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
         managerMap[manager].gpAchievement += getSaleCollectableAmount(s);
@@ -6340,17 +6433,9 @@ function showPage(page) {
       cashData.forEach(c => {
         const manager = getCashEntryManager(c);
         if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
-        const collectKey = getCashSaleCollectionKey(c);
-        if (!managerCollectKeys[manager]) managerCollectKeys[manager] = {};
-        managerCollectKeys[manager][collectKey] = Math.max(managerCollectKeys[manager][collectKey] || 0, getCashCollectableAmount(c));
         managerMap[manager].cashDeposit += Number(c.cashDepositCounter) || 0;
         managerMap[manager].onlineDeposit += Number(c.onlineDeposit) || 0;
         managerMap[manager].totalDeposit += Number(c.totalDeposit) || 0;
-      });
-
-      Object.entries(managerCollectKeys).forEach(([manager, values]) => {
-        if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
-        managerMap[manager].gpAchievement += Object.values(values).reduce((sum, value) => sum + value, 0);
       });
 
       const rows = Object.entries(managerMap).map(([name, data]) => ({
@@ -6442,7 +6527,21 @@ function showPage(page) {
           pending: totalSale - deposited
         };
       }).filter(r => r.pending > 0).sort((a, b) => b.pending - a.pending);
-      tbody.innerHTML = rows.length ? rows.map(r => `
+      const totals = rows.reduce((acc, r) => {
+        acc.totalSale += r.totalSale;
+        acc.deposited += r.deposited;
+        acc.pending += r.pending;
+        return acc;
+      }, { totalSale: 0, deposited: 0, pending: 0 });
+      tbody.innerHTML = rows.length ? `
+        <tr class="table-total-row">
+          <td colspan="6"><strong>Total (${rows.length} Pending)</strong></td>
+          <td><strong>${formatCurrency(totals.totalSale)}</strong></td>
+          <td><strong>${formatCurrency(totals.deposited)}</strong></td>
+          <td><strong>${formatCurrency(totals.pending)}</strong></td>
+          <td></td>
+        </tr>
+      ` + rows.map(r => `
         <tr>
           <td>${r.trainManager}</td>
           <td>${r.rakeManager}</td>
@@ -6465,9 +6564,8 @@ function showPage(page) {
         showAlert('Related sales entry was not found.', 'error');
         return;
       }
-      const matchingDeposits = (appData.cash || []).filter(c => isSameTrainForCashSale(c, sale));
-      const deposited = matchingDeposits.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
       const amountToCollect = getSaleCollectableAmount(sale);
+      const deposited = getDepositedAmountForSalesEntry(sale);
       const pending = Math.max(amountToCollect - deposited, 0);
       if (pending <= 0 && !confirm('This sales entry has no pending balance. Add another deposit anyway?')) return;
 
@@ -6482,7 +6580,7 @@ function showPage(page) {
       document.getElementById('cashTrainNo').value = sale.trainNumber || '';
       document.getElementById('cashTrainManager').value = sale.trainManager || '';
       document.getElementById('cashRakeManager').value = sale.rakeManager || '';
-      document.getElementById('cashGpFromSales').value = amountToCollect || '';
+      document.getElementById('cashGpFromSales').value = pending || amountToCollect || '';
       document.getElementById('cashBalanceDue') && (document.getElementById('cashBalanceDue').value = pending);
       document.getElementById('cashDepositCounter').value = '';
       document.getElementById('cashOnlineDeposit').value = '';
@@ -6537,7 +6635,8 @@ function showPage(page) {
         : null;
       if (salesEntry) {
         document.getElementById('cashSalesEntryId') && (document.getElementById('cashSalesEntryId').value = salesEntry.id || '');
-        document.getElementById('cashGpFromSales').value = Number(salesEntry.amountToCollect || salesEntry.salesAchievement || salesEntry.totalSale) || 0;
+        const pendingAmount = getPendingAmountForSalesEntry(salesEntry, editingType === 'cash' ? editingId : null);
+        document.getElementById('cashGpFromSales').value = pendingAmount || 0;
         document.getElementById('cashTrainManager').value = salesEntry.trainManager || '';
         document.getElementById('cashRakeManager').value = salesEntry.rakeManager || '';
         const arrivalInput = document.getElementById('cashArrivalDate');
@@ -8060,16 +8159,25 @@ function showPage(page) {
       document.getElementById('cashFilterTrain').innerHTML = '<option value="">All Trains</option>' + trains.map(t => `<option value="${t.trainName}">${t.trainName}</option>`).join('');
       
       loadCashList();
+      loadBankDepositList();
     }
 
     function switchCashTab(tab) {
       document.querySelectorAll('#page-cash .tab').forEach(t => t.classList.remove('active'));
       const clickedTab = window.event?.target;
-      const fallbackTab = Array.from(document.querySelectorAll('#page-cash .tab')).find(t => t.textContent.toLowerCase().includes(tab === 'entry' ? 'new entry' : 'view entries'));
+      const fallbackTab = Array.from(document.querySelectorAll('#page-cash .tab')).find(t => {
+        const text = t.textContent.toLowerCase();
+        if (tab === 'entry') return text.includes('new entry');
+        if (tab === 'list') return text.includes('view entries');
+        if (tab === 'bank') return text.includes('bank deposit');
+        return false;
+      });
       (clickedTab || fallbackTab)?.classList.add('active');
       document.getElementById('cashEntryTab').classList.toggle('hidden', tab !== 'entry');
       document.getElementById('cashListTab').classList.toggle('hidden', tab !== 'list');
+      document.getElementById('cashBankTab').classList.toggle('hidden', tab !== 'bank');
       if (tab === 'list') loadCashList();
+      if (tab === 'bank') loadBankDepositList();
     }
 
     function filterCashTrains(query) {
@@ -8091,6 +8199,123 @@ function showPage(page) {
       document.getElementById('cashTrainManager').value = effective?.trainManager || '';
       document.getElementById('cashRakeManager').value = effective?.rakeManager || '';
       updateCashGPFromSales();
+    }
+
+    async function handleBankReceiptUpload(input) {
+      const files = Array.from(input.files || []);
+      if (!files.length) return;
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) continue;
+        const dataUrl = await readFileAsDataUrl(file);
+        bankReceiptFiles.push({
+          name: file.name || `bank_receipt_${Date.now()}.jpg`,
+          type: file.type,
+          size: file.size,
+          uploadedAt: new Date().toISOString(),
+          dataUrl
+        });
+      }
+      input.value = '';
+      renderBankReceiptPreview();
+      showAlert(`${files.length} bank receipt image(s) attached.`, 'success');
+    }
+
+    function renderBankReceiptPreview() {
+      const box = document.getElementById('bankReceiptPreview');
+      if (!box) return;
+      box.innerHTML = bankReceiptFiles.length
+        ? `<strong>Receipt Images:</strong> ${bankReceiptFiles.length} <button class="btn btn-ghost btn-sm" onclick="openBankReceiptDraftModal()"><i class="fas fa-eye"></i> View</button>`
+        : 'No bank receipt image attached.';
+    }
+
+    function openBankReceiptDraftModal() {
+      openSalesSupportModalForFiles('Bank Deposit Receipts', bankReceiptFiles || []);
+    }
+
+    function openBankReceiptSavedModal(id) {
+      const record = (appData.bankDeposits || []).find(r => String(r.id) === String(id));
+      openSalesSupportModalForFiles('Bank Deposit Receipts', record?.receiptFiles || []);
+    }
+
+    function clearBankDepositForm() {
+      document.getElementById('bankDepositDate').value = '';
+      document.getElementById('bankCollectionDate').value = '';
+      document.getElementById('bankDepositAmount').value = '';
+      document.getElementById('bankDepositRemarks').value = '';
+      bankReceiptFiles = [];
+      renderBankReceiptPreview();
+    }
+
+    function saveBankDepositEntry() {
+      if (!ensureEditable('save bank deposit')) return;
+      const depositDate = document.getElementById('bankDepositDate').value;
+      const collectionDate = document.getElementById('bankCollectionDate').value;
+      const amount = Number(document.getElementById('bankDepositAmount').value) || 0;
+      if (!depositDate || amount <= 0) {
+        showAlert('Please enter bank deposit date and amount.', 'error');
+        return;
+      }
+      appData.bankDeposits = appData.bankDeposits || [];
+      appData.bankDeposits.push({
+        id: Date.now(),
+        depositDate,
+        collectionDate,
+        amount,
+        receiptFiles: JSON.parse(JSON.stringify(bankReceiptFiles || [])),
+        remarks: document.getElementById('bankDepositRemarks').value || '',
+        createdAt: new Date().toISOString(),
+        createdBy: currentUser?.email || ''
+      });
+      saveData();
+      clearBankDepositForm();
+      loadBankDepositList();
+      showAlert('Bank deposit saved successfully.', 'success');
+    }
+
+    function loadBankDepositList() {
+      const tbody = document.getElementById('bankDepositTableBody');
+      if (!tbody) return;
+      const rows = [...(appData.bankDeposits || [])].sort((a, b) => String(b.depositDate || '').localeCompare(String(a.depositDate || '')));
+      const total = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+      tbody.innerHTML = rows.length ? `
+        <tr class="table-total-row">
+          <td colspan="2"><strong>Total (${rows.length} Entries)</strong></td>
+          <td><strong>${formatCurrency(total)}</strong></td>
+          <td colspan="3"></td>
+        </tr>
+      ` + rows.map(r => `
+        <tr>
+          <td>${formatDate(r.depositDate)}</td>
+          <td>${formatDate(r.collectionDate)}</td>
+          <td>${formatCurrency(r.amount)}</td>
+          <td>${(r.receiptFiles || []).length ? `<button class="btn btn-ghost btn-sm" onclick="openBankReceiptSavedModal('${r.id}')"><i class="fas fa-image"></i> ${(r.receiptFiles || []).length}</button>` : '-'}</td>
+          <td>${r.remarks || '-'}</td>
+          <td>${isReadOnlyUser() ? '-' : `<button class="btn-icon delete" onclick="deleteBankDepositEntry(${r.id})"><i class="fas fa-trash"></i></button>`}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="6" style="text-align:center;color:#64748b;">No bank deposit entries saved.</td></tr>';
+    }
+
+    function deleteBankDepositEntry(id) {
+      if (!ensureEditable('delete bank deposit')) return;
+      if (!confirm('Delete this bank deposit entry?')) return;
+      appData.bankDeposits = (appData.bankDeposits || []).filter(r => String(r.id) !== String(id));
+      saveData();
+      loadBankDepositList();
+      showAlert('Bank deposit entry deleted.', 'success');
+    }
+
+    function downloadBankDepositEntries() {
+      const rows = (appData.bankDeposits || []).map(r => ({
+        'Bank Deposit Date': r.depositDate || '',
+        'Cash Collection Date': r.collectionDate || '',
+        'Amount': r.amount || 0,
+        'Receipt Count': (r.receiptFiles || []).length,
+        'Receipt Names': (r.receiptFiles || []).map(f => f.name).join(', '),
+        'Remarks': r.remarks || '',
+        'Created By': r.createdBy || '',
+        'Created At': r.createdAt || ''
+      }));
+      downloadExcel(rows, `bank_deposit_entries_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
 
     function calculateTotalDeposit() {
@@ -10209,12 +10434,29 @@ function showPage(page) {
       doc.save(`complaint_dashboard_detail_${new Date().toISOString().split('T')[0]}.pdf`);
     }
 
-    function downloadCashDashboardExcel() { 
-      const fromDate = document.getElementById('cashDashFromDate')?.value;
-      const toDate = document.getElementById('cashDashToDate')?.value;
-      let cashData = [...(appData.cash || [])];
-      if (fromDate || toDate) cashData = cashData.filter(c => isCashEntryInDateRange(c, fromDate, toDate));
-      downloadExcel(cashData, `cash_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); 
+    function downloadCashDashboardExcel() {
+      const wb = XLSX.utils.book_new();
+      const addTableSheet = (tableId, sheetName) => {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        const ws = XLSX.utils.table_to_sheet(table);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      };
+
+      const summaryRows = [
+        { Metric: 'Total Amount To Collect', Value: document.getElementById('cashKpiGpCollected')?.textContent || '' },
+        { Metric: 'Total Deposit', Value: document.getElementById('cashKpiTotalDeposit')?.textContent || '' },
+        { Metric: 'Cash Counter', Value: document.getElementById('cashKpiCashCounter')?.textContent || '' },
+        { Metric: 'Online Deposit', Value: document.getElementById('cashKpiOnlineDeposit')?.textContent || '' },
+        { Metric: 'Cash Entry Count', Value: document.getElementById('cashKpiCount')?.textContent || '' },
+        { Metric: 'Pending Shortage Count', Value: document.getElementById('cashKpiPendingShortage')?.textContent || '' }
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Dashboard Summary');
+      addTableSheet('cashCollectionTable', 'Date-wise Summary');
+      addTableSheet('managerCashTable', 'Manager Summary');
+      addTableSheet('pendingDepositTable', 'Pending Deposit');
+      addTableSheet('bankDepositTable', 'Bank Deposits');
+      XLSX.writeFile(wb, `cash_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`);
     }
 
     function downloadTableExcel(tableId, filename) {
@@ -10271,6 +10513,7 @@ function showPage(page) {
       addSheet('Sales', appData.sales);
       addSheet('Complaints', appData.complaints);
       addSheet('Cash Deposits', appData.cash);
+      addSheet('Bank Deposits', appData.bankDeposits);
       addSheet('Yards', (appData.yards || []).map(name => ({ name })));
       addSheet('Cluster Managers', (appData.clusterManagers || []).map(name => ({ name })));
       addSheet('Train Manager Names', (appData.trainManagers || []).map(name => ({ name })));
@@ -10378,6 +10621,7 @@ function showPage(page) {
         if (cloudData.sales) appData.sales = cloudData.sales;
         if (cloudData.complaints) appData.complaints = cloudData.complaints;
         if (cloudData.cash) appData.cash = cloudData.cash;
+        if (cloudData.bankDeposits) appData.bankDeposits = cloudData.bankDeposits;
         if (cloudData.masterLogs) appData.masterLogs = cloudData.masterLogs;
         
         saveData();
@@ -10490,6 +10734,7 @@ function showPage(page) {
         sales: source.sales || [],
         complaints: source.complaints || [],
         cash: source.cash || [],
+        bankDeposits: source.bankDeposits || [],
         masterLogs: source.masterLogs || [],
         deletedRecords: source.deletedRecords || {}
       };
@@ -10510,6 +10755,7 @@ function showPage(page) {
         sales: mergeArrayByKey(cloudData.sales, localData.sales, getDeletedSet('sales', cloudData, localData)),
         complaints: mergeArrayByKey(cloudData.complaints, localData.complaints, getDeletedSet('complaints', cloudData, localData)),
         cash: mergeArrayByKey(cloudData.cash, localData.cash, getDeletedSet('cash', cloudData, localData)),
+        bankDeposits: mergeArrayByKey(cloudData.bankDeposits, localData.bankDeposits, getDeletedSet('bankDeposits', cloudData, localData)),
         masterLogs: mergeArrayByKey(cloudData.masterLogs, localData.masterLogs, getDeletedSet('masterLogs', cloudData, localData)),
         deletedRecords: { ...(cloudData.deletedRecords || {}), ...(localData.deletedRecords || {}) }
       };
@@ -10603,6 +10849,14 @@ function showPage(page) {
     window.editCashEntry = editCashEntry;
     window.deleteCashEntry = deleteCashEntry;
     window.startPendingCashDeposit = startPendingCashDeposit;
+    window.handleBankReceiptUpload = handleBankReceiptUpload;
+    window.openBankReceiptDraftModal = openBankReceiptDraftModal;
+    window.openBankReceiptSavedModal = openBankReceiptSavedModal;
+    window.saveBankDepositEntry = saveBankDepositEntry;
+    window.clearBankDepositForm = clearBankDepositForm;
+    window.loadBankDepositList = loadBankDepositList;
+    window.deleteBankDepositEntry = deleteBankDepositEntry;
+    window.downloadBankDepositEntries = downloadBankDepositEntries;
     window.saveTrainMaster = saveTrainMaster;
     window.saveItemRateMaster = saveItemRateMaster;
     window.clearItemRateMasterForm = clearItemRateMasterForm;
