@@ -3912,8 +3912,7 @@ function showPage(page) {
       const statusFilter = document.getElementById('compDashStatusFilter')?.value;
       const yardFilter = document.getElementById('compDashYardFilter')?.value;
 
-      if (fromDate) filtered = filtered.filter(c => c.date >= fromDate);
-      if (toDate) filtered = filtered.filter(c => c.date <= toDate);
+      if (fromDate || toDate) filtered = filtered.filter(c => isCashEntryInDateRange(c, fromDate, toDate));
       if (trainFilters.length) filtered = filtered.filter(c => trainFilters.includes(c.trainName));
       if (statusFilter) filtered = filtered.filter(c => c.status === statusFilter);
       if (yardFilter) filtered = filtered.filter(c => c.yard === yardFilter);
@@ -4118,8 +4117,7 @@ function showPage(page) {
       if (currentUser.yard !== 'ALL') complaints = complaints.filter(c => c.yard === currentUser.yard);
       
       let cash = [...(appData.cash || [])];
-      if (fromDate1) cash = cash.filter(c => c.date >= fromDate1);
-      if (toDate1) cash = cash.filter(c => c.date <= toDate1);
+      if (fromDate1 || toDate1) cash = cash.filter(c => isCashEntryInDateRange(c, fromDate1, toDate1));
       if (currentUser.yard !== 'ALL') cash = cash.filter(c => c.yard === currentUser.yard);
 
       // Calculate KPIs for Period 1
@@ -6175,8 +6173,9 @@ function showPage(page) {
       let cashData = [...(appData.cash || [])];
       let salesData = [...(appData.sales || [])];
 
-      if (fromDate) { cashData = cashData.filter(c => getCashEntryDate(c) >= fromDate); salesData = salesData.filter(s => getSalesCashDate(s) >= fromDate); }
-      if (toDate) { cashData = cashData.filter(c => getCashEntryDate(c) <= toDate); salesData = salesData.filter(s => getSalesCashDate(s) <= toDate); }
+      if (fromDate || toDate) { cashData = cashData.filter(c => isCashEntryInDateRange(c, fromDate, toDate)); }
+      if (fromDate) { salesData = salesData.filter(s => getSalesCashDate(s) >= fromDate); }
+      if (toDate) { salesData = salesData.filter(s => getSalesCashDate(s) <= toDate); }
       if (yardFilter) { cashData = cashData.filter(c => c.yard === yardFilter); salesData = salesData.filter(s => s.yard === yardFilter); }
       if (managerFilter) { cashData = cashData.filter(c => getCashEntryManager(c) === managerFilter); salesData = salesData.filter(s => s.trainManager === managerFilter); }
 
@@ -6231,7 +6230,22 @@ function showPage(page) {
     }
 
     function getCashEntryDate(entry) {
-      return getComparableDate(entry?.date || entry?.entryDate || entry?.arrivalDate || '');
+      return getComparableDate(entry?.entryDate || entry?.depositDate || entry?.date || entry?.arrivalDate || '');
+    }
+
+    function getCashEntryDateCandidates(entry) {
+      return [...new Set([
+        getComparableDate(entry?.entryDate || ''),
+        getComparableDate(entry?.depositDate || ''),
+        getComparableDate(entry?.date || ''),
+        getComparableDate(entry?.arrivalDate || '')
+      ].filter(Boolean))];
+    }
+
+    function isCashEntryInDateRange(entry, fromDate = '', toDate = '') {
+      const dates = getCashEntryDateCandidates(entry);
+      if (!dates.length) return false;
+      return dates.some(date => (!fromDate || date >= fromDate) && (!toDate || date <= toDate));
     }
 
     function getSalesCashDate(entry) {
@@ -6315,6 +6329,7 @@ function showPage(page) {
 
     function renderManagerCashTable(cashData, salesData) {
       const managerMap = {};
+      const managerCollectKeys = {};
       
       if (!(cashData || []).length) salesData.forEach(s => {
         const manager = s.trainManager || 'Unassigned';
@@ -6484,10 +6499,13 @@ function showPage(page) {
       const selectedRake = normalizeText(rakeNumber);
       const selectedManager = normalizeText(rakeManager);
       return (appData.sales || []).find(s => {
-        if (getCashDashboardDate(s) !== day) return false;
+        const saleDates = [getSalesCashDate(s), getComparableDate(s.date || '')].filter(Boolean);
+        if (day && !saleDates.includes(day)) return false;
         const sameMaster = trainId && s.trainId && String(s.trainId) === String(trainId);
         const sameTrain = buildTrainKey(s.trainNumber, s.trainName) === buildTrainKey(trainNumber, trainName);
-        if (!sameMaster && !sameTrain) return false;
+        const sameTrainName = normalizeText(s.trainName) && normalizeText(trainName) && normalizeText(s.trainName) === normalizeText(trainName);
+        const sameTrainNo = normalizeTrainNo(s.trainNumber) && normalizeTrainNo(trainNumber) && normalizeTrainNo(s.trainNumber) === normalizeTrainNo(trainNumber);
+        if (!sameMaster && !sameTrain && !sameTrainName && !sameTrainNo) return false;
         const saleRake = normalizeText(s.rakeNumber);
         const saleManager = normalizeText(s.rakeManager);
         if (selectedRake && saleRake && selectedRake !== saleRake) return false;
@@ -7875,7 +7893,7 @@ function showPage(page) {
 
       if (currentUser.yard !== 'ALL') filtered = filtered.filter(c => c.yard === currentUser.yard);
 
-      filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+      filtered.sort((a, b) => new Date(getCashEntryDate(b)) - new Date(getCashEntryDate(a)));
       return filtered;
     }
 
@@ -8091,13 +8109,22 @@ function showPage(page) {
       const gpFromSales = Number(document.getElementById('cashGpFromSales').value) || 0;
       const shortageReason = document.getElementById('cashShortageReason').value;
 
-      if (!date || !yard || !document.getElementById('cashTrainId').value) { showAlert('Please select date, yard and train', 'error'); return; }
       const trainId = document.getElementById('cashTrainId').value;
       const forcedSalesEntryId = document.getElementById('cashSalesEntryId')?.value || '';
+      const typedTrainName = document.getElementById('cashTrainSearch')?.value || '';
+      const typedTrainNumber = document.getElementById('cashTrainNo')?.value || '';
+      if (!date || !yard || !(trainId || typedTrainName || typedTrainNumber || forcedSalesEntryId)) { showAlert('Please select date, yard and train', 'error'); return; }
       const train = trainId ? appData.trainMasters.find(t => t.id == trainId) : null;
       const salesEntry = forcedSalesEntryId
         ? (appData.sales || []).find(s => String(s.id) === String(forcedSalesEntryId))
-        : train ? findSalesEntryForCash(date, trainId, train.trainNumber, train.trainName, train.rakeManager, train.rakeNumber) : null;
+        : findSalesEntryForCash(
+            date,
+            trainId,
+            train?.trainNumber || typedTrainNumber,
+            train?.trainName || typedTrainName,
+            train?.rakeManager || document.getElementById('cashRakeManager')?.value || '',
+            train?.rakeNumber || ''
+          );
       if (!salesEntry) { showAlert('Cash deposit can be saved only after a sales entry exists for this exact train and rake manager.', 'error'); return; }
 
       if (gpFromSales > 0 && (cashDeposit + onlineDeposit) < gpFromSales && !shortageReason) {
@@ -10186,8 +10213,7 @@ function showPage(page) {
       const fromDate = document.getElementById('cashDashFromDate')?.value;
       const toDate = document.getElementById('cashDashToDate')?.value;
       let cashData = [...(appData.cash || [])];
-      if (fromDate) cashData = cashData.filter(c => getCashEntryDate(c) >= fromDate);
-      if (toDate) cashData = cashData.filter(c => getCashEntryDate(c) <= toDate);
+      if (fromDate || toDate) cashData = cashData.filter(c => isCashEntryInDateRange(c, fromDate, toDate));
       downloadExcel(cashData, `cash_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); 
     }
 
