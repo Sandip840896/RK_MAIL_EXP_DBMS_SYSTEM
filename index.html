@@ -1893,7 +1893,7 @@
             <div class="kpi-card info">
               <div class="kpi-label">Total Sale To Collect</div>
               <div class="kpi-value" id="cashKpiGpCollected">₹0</div>
-              <div class="kpi-sub">From sales entries</div>
+              <div class="kpi-sub">From selected cash entries</div>
             </div>
             <div class="kpi-card success">
               <div class="kpi-label">Total Deposit</div>
@@ -2072,6 +2072,7 @@
                   <div class="searchable-select">
                     <input type="text" id="cashTrainSearch" placeholder="Search train..." oninput="filterCashTrains(this.value)" onfocus="showCashTrainDropdown()" onchange="updateCashGPFromSales()">
                     <input type="hidden" id="cashTrainId">
+                    <input type="hidden" id="cashSalesEntryId">
                     <div class="searchable-dropdown" id="cashTrainDropdown"></div>
                   </div>
                 </div>
@@ -3825,16 +3826,12 @@ function showPage(page) {
 
       // Bucket filters
       if (salesBucketFilter) {
-        filtered = filtered.filter(s => {
-          const pct = s.salesTarget > 0 ? (s.salesAchievement / s.salesTarget) * 100 : 0;
-          return checkBucket(pct, salesBucketFilter);
-        });
+        const bucketTrainKeys = getSalesTrainKeysForBucket(filtered, salesBucketFilter, 'sales');
+        filtered = filtered.filter(s => bucketTrainKeys.has(buildTrainKey(s.trainNumber, s.trainName) || normalizeText(s.trainName) || String(s.trainId || s.id || '')));
       }
       if (gpBucketFilter) {
-        filtered = filtered.filter(s => {
-          const pct = s.gpTarget > 0 ? (s.gpAchievement / s.gpTarget) * 100 : 0;
-          return checkBucket(pct, gpBucketFilter);
-        });
+        const bucketTrainKeys = getSalesTrainKeysForBucket(filtered, gpBucketFilter, 'gp');
+        filtered = filtered.filter(s => bucketTrainKeys.has(buildTrainKey(s.trainNumber, s.trainName) || normalizeText(s.trainName) || String(s.trainId || s.id || '')));
       }
 
       if (currentUser.yard !== 'ALL') {
@@ -3853,6 +3850,40 @@ function showPage(page) {
         case 'Below 70%': return pct < 70;
         default: return true;
       }
+    }
+
+    function aggregateSalesByUniqueTrain(sales) {
+      const trainMap = {};
+      (sales || []).forEach(s => {
+        const key = buildTrainKey(s.trainNumber, s.trainName) || normalizeText(s.trainName) || String(s.trainId || s.id || '');
+        if (!trainMap[key]) {
+          trainMap[key] = {
+            key,
+            trainName: s.trainName || '',
+            trainNumber: s.trainNumber || '',
+            salesTarget: 0,
+            salesAchievement: 0,
+            gpTarget: 0,
+            gpAchievement: 0,
+            entries: 0
+          };
+        }
+        trainMap[key].salesTarget += Number(s.salesTarget) || 0;
+        trainMap[key].salesAchievement += Number(s.salesAchievement || s.totalSale) || 0;
+        trainMap[key].gpTarget += Number(s.gpTarget) || 0;
+        trainMap[key].gpAchievement += Number(s.gpAchievement) || 0;
+        trainMap[key].entries += 1;
+      });
+      return Object.values(trainMap);
+    }
+
+    function getSalesTrainKeysForBucket(sales, bucket, metric) {
+      return new Set(aggregateSalesByUniqueTrain(sales).filter(train => {
+        const target = metric === 'gp' ? train.gpTarget : train.salesTarget;
+        const actual = metric === 'gp' ? train.gpAchievement : train.salesAchievement;
+        const pct = target > 0 ? (actual / target) * 100 : 0;
+        return checkBucket(pct, bucket);
+      }).map(train => train.key));
     }
 
     function getFilteredComplaints(period) {
@@ -4223,7 +4254,7 @@ function showPage(page) {
       const buckets = { 'Above 100%': 0, '90-100%': 0, '80-90%': 0, '70-80%': 0, 'Below 70%': 0 };
       const colors = { 'Above 100%': 'success', '90-100%': 'success', '80-90%': 'success', '70-80%': 'warning', 'Below 70%': 'danger' };
 
-      sales.forEach(s => {
+      aggregateSalesByUniqueTrain(sales).forEach(s => {
         const pct = s.salesTarget > 0 ? (s.salesAchievement / s.salesTarget) * 100 : 0;
         if (pct >= 100) buckets['Above 100%']++;
         else if (pct >= 90) buckets['90-100%']++;
@@ -4244,7 +4275,7 @@ function showPage(page) {
       const buckets = { 'Above 100%': 0, '90-100%': 0, '80-90%': 0, '70-80%': 0, 'Below 70%': 0 };
       const colors = { 'Above 100%': 'success', '90-100%': 'success', '80-90%': 'success', '70-80%': 'warning', 'Below 70%': 'danger' };
 
-      sales.forEach(s => {
+      aggregateSalesByUniqueTrain(sales).forEach(s => {
         const pct = s.gpTarget > 0 ? (s.gpAchievement / s.gpTarget) * 100 : 0;
         if (pct >= 100) buckets['Above 100%']++;
         else if (pct >= 90) buckets['90-100%']++;
@@ -4492,6 +4523,7 @@ function showPage(page) {
       if (!ctx) return;
 
       const managerMap = {};
+      const managerCollectKeys = {};
       sales.forEach(s => { if (s.trainManager) managerMap[s.trainManager] = (managerMap[s.trainManager] || 0) + (Number(s.gpAchievement) || 0); });
 
       const managers = Object.keys(managerMap);
@@ -6143,18 +6175,20 @@ function showPage(page) {
       let cashData = [...(appData.cash || [])];
       let salesData = [...(appData.sales || [])];
 
-      if (fromDate) { cashData = cashData.filter(c => getCashDashboardDate(c) >= fromDate); salesData = salesData.filter(s => getCashDashboardDate(s) >= fromDate); }
-      if (toDate) { cashData = cashData.filter(c => getCashDashboardDate(c) <= toDate); salesData = salesData.filter(s => getCashDashboardDate(s) <= toDate); }
+      if (fromDate) { cashData = cashData.filter(c => getCashEntryDate(c) >= fromDate); salesData = salesData.filter(s => getSalesCashDate(s) >= fromDate); }
+      if (toDate) { cashData = cashData.filter(c => getCashEntryDate(c) <= toDate); salesData = salesData.filter(s => getSalesCashDate(s) <= toDate); }
       if (yardFilter) { cashData = cashData.filter(c => c.yard === yardFilter); salesData = salesData.filter(s => s.yard === yardFilter); }
-      if (managerFilter) { cashData = cashData.filter(c => { const train = appData.trainMasters.find(t => t.trainName === c.trainName); return train && train.trainManager === managerFilter; }); salesData = salesData.filter(s => s.trainManager === managerFilter); }
+      if (managerFilter) { cashData = cashData.filter(c => getCashEntryManager(c) === managerFilter); salesData = salesData.filter(s => s.trainManager === managerFilter); }
 
-      const gpCollected = salesData.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
+      const collectFromCashEntries = sumUniqueCashCollectable(cashData);
+      const collectFromSalesEntries = salesData.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
+      const gpCollected = cashData.length ? collectFromCashEntries : collectFromSalesEntries;
       const totalDeposit = cashData.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
       const cashCounter = cashData.reduce((sum, c) => sum + (Number(c.cashDepositCounter) || 0), 0);
       const onlineDeposit = cashData.reduce((sum, c) => sum + (Number(c.onlineDeposit) || 0), 0);
       const difference = gpCollected - totalDeposit;
       const pendingShortage = cashData.filter(c => {
-        const amountToCollect = Number(c.amountToCollect || c.gpFromSales || c.gpCollected) || 0;
+        const amountToCollect = getCashCollectableAmount(c);
         const deposit = Number(c.totalDeposit) || 0;
         return amountToCollect > 0 && deposit < amountToCollect;
       }).length;
@@ -6196,8 +6230,39 @@ function showPage(page) {
       return getComparableDate(entry?.arrivalDate || entry?.date || entry?.entryDate || '');
     }
 
+    function getCashEntryDate(entry) {
+      return getComparableDate(entry?.date || entry?.entryDate || entry?.arrivalDate || '');
+    }
+
+    function getSalesCashDate(entry) {
+      return getComparableDate(entry?.arrivalDate || entry?.date || '');
+    }
+
     function getSaleCollectableAmount(sale) {
       return Number(sale?.amountToCollect || sale?.salesAchievement || sale?.totalSale) || 0;
+    }
+
+    function getCashCollectableAmount(cashEntry) {
+      return Number(cashEntry?.amountToCollect || cashEntry?.gpFromSales || cashEntry?.gpCollected) || 0;
+    }
+
+    function getCashSaleCollectionKey(cashEntry) {
+      if (cashEntry?.salesEntryId) return `sale:${cashEntry.salesEntryId}`;
+      return [
+        getSalesCashDate(cashEntry),
+        buildTrainKey(cashEntry?.trainNumber, cashEntry?.trainName),
+        normalizeText(cashEntry?.rakeNumber),
+        normalizeText(cashEntry?.rakeManager)
+      ].join('|');
+    }
+
+    function sumUniqueCashCollectable(cashEntries) {
+      const map = {};
+      (cashEntries || []).forEach(c => {
+        const key = getCashSaleCollectionKey(c);
+        map[key] = Math.max(map[key] || 0, getCashCollectableAmount(c));
+      });
+      return Object.values(map).reduce((sum, value) => sum + value, 0);
     }
 
     function getCashEntryManager(cashEntry) {
@@ -6209,20 +6274,22 @@ function showPage(page) {
     function renderCashCollectionTable(cashData, salesData) {
       const tbody = document.getElementById('cashCollectionTableBody');
       if (!tbody) return;
-      const dates = [...new Set([...(salesData || []).map(getCashDashboardDate), ...(cashData || []).map(getCashDashboardDate)].filter(Boolean))].sort();
+      const dates = [...new Set([...(salesData || []).map(getSalesCashDate), ...(cashData || []).map(getCashEntryDate)].filter(Boolean))].sort();
       const rows = dates.map(date => {
-        const daySales = (salesData || []).filter(s => getCashDashboardDate(s) === date);
-        const dayCash = (cashData || []).filter(c => getCashDashboardDate(c) === date);
-        const amountToCollect = daySales.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
+        const daySales = (salesData || []).filter(s => getSalesCashDate(s) === date);
+        const dayCash = (cashData || []).filter(c => getCashEntryDate(c) === date);
+        const amountToCollect = dayCash.length
+          ? sumUniqueCashCollectable(dayCash)
+          : daySales.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
         const cashDeposit = dayCash.reduce((sum, c) => sum + (Number(c.cashDepositCounter) || 0), 0);
         const onlineDeposit = dayCash.reduce((sum, c) => sum + (Number(c.onlineDeposit) || 0), 0);
         const totalDeposit = dayCash.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
         const pendingNoDeposit = daySales.reduce((sum, s) => {
-          const matchingDeposits = dayCash.filter(c => isSameTrainForCashSale(c, s));
+          const matchingDeposits = (appData.cash || []).filter(c => isSameTrainForCashSale(c, s));
           return matchingDeposits.length ? sum : sum + getSaleCollectableAmount(s);
         }, 0);
         const pendingShort = daySales.reduce((sum, s) => {
-          const matchingDeposits = dayCash.filter(c => isSameTrainForCashSale(c, s));
+          const matchingDeposits = (appData.cash || []).filter(c => isSameTrainForCashSale(c, s));
           if (!matchingDeposits.length) return sum;
           const deposited = matchingDeposits.reduce((total, c) => total + (Number(c.totalDeposit) || 0), 0);
           return sum + Math.max(getSaleCollectableAmount(s) - deposited, 0);
@@ -6249,7 +6316,7 @@ function showPage(page) {
     function renderManagerCashTable(cashData, salesData) {
       const managerMap = {};
       
-      salesData.forEach(s => {
+      if (!(cashData || []).length) salesData.forEach(s => {
         const manager = s.trainManager || 'Unassigned';
         if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
         managerMap[manager].gpAchievement += getSaleCollectableAmount(s);
@@ -6258,9 +6325,17 @@ function showPage(page) {
       cashData.forEach(c => {
         const manager = getCashEntryManager(c);
         if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
+        const collectKey = getCashSaleCollectionKey(c);
+        if (!managerCollectKeys[manager]) managerCollectKeys[manager] = {};
+        managerCollectKeys[manager][collectKey] = Math.max(managerCollectKeys[manager][collectKey] || 0, getCashCollectableAmount(c));
         managerMap[manager].cashDeposit += Number(c.cashDepositCounter) || 0;
         managerMap[manager].onlineDeposit += Number(c.onlineDeposit) || 0;
         managerMap[manager].totalDeposit += Number(c.totalDeposit) || 0;
+      });
+
+      Object.entries(managerCollectKeys).forEach(([manager, values]) => {
+        if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
+        managerMap[manager].gpAchievement += Object.values(values).reduce((sum, value) => sum + value, 0);
       });
 
       const rows = Object.entries(managerMap).map(([name, data]) => ({
@@ -6300,6 +6375,10 @@ function showPage(page) {
 
     function isSameTrainForCashSale(cashEntry, saleEntry) {
       if (!cashEntry || !saleEntry) return false;
+      if (cashEntry.salesEntryId && saleEntry.id && String(cashEntry.salesEntryId) === String(saleEntry.id)) return true;
+      const cashSaleDate = getSalesCashDate(cashEntry);
+      const saleDate = getSalesCashDate(saleEntry);
+      if (cashSaleDate && saleDate && cashSaleDate !== saleDate) return false;
       const sameTrain = buildTrainKey(cashEntry.trainNumber, cashEntry.trainName) === buildTrainKey(saleEntry.trainNumber, saleEntry.trainName);
       const sameMasterId = cashEntry.trainId && saleEntry.trainId && String(cashEntry.trainId) === String(saleEntry.trainId);
       const cashRake = normalizeText(cashEntry.rakeNumber);
@@ -6325,16 +6404,18 @@ function showPage(page) {
           <th>Amount To Collect</th>
           <th>Total Deposited</th>
           <th>Amount Pending</th>
+          <th>Action</th>
         `;
       }
       const tbody = document.getElementById('pendingDepositTableBody');
       if (!tbody) return;
       const rows = salesData.map(s => {
-        const matchingDeposits = cashData.filter(c => getCashDashboardDate(c) === getCashDashboardDate(s) && isSameTrainForCashSale(c, s));
+        const matchingDeposits = (appData.cash || []).filter(c => isSameTrainForCashSale(c, s));
         const deposited = matchingDeposits.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
         const totalSale = getSaleCollectableAmount(s);
         const latestCash = matchingDeposits.sort((a, b) => Number(b.id || 0) - Number(a.id || 0))[0];
         return {
+          salesId: s.id || '',
           rakeManager: latestCash?.rakeManager || s.rakeManager || 'Unassigned',
           trainManager: latestCash?.trainManager || s.trainManager || 'Unassigned',
           trainName: s.trainName || latestCash?.trainName || '-',
@@ -6357,8 +6438,45 @@ function showPage(page) {
           <td>${formatCurrency(r.totalSale)}</td>
           <td>${formatCurrency(r.deposited)}</td>
           <td><strong>${formatCurrency(r.pending)}</strong></td>
+          <td><button class="btn btn-primary btn-sm" onclick="startPendingCashDeposit('${r.salesId}')">Add Deposit</button></td>
         </tr>
-      `).join('') : '<tr><td colspan="9" style="text-align:center;color:#64748b;">No pending deposits for selected filters.</td></tr>';
+      `).join('') : '<tr><td colspan="10" style="text-align:center;color:#64748b;">No pending deposits for selected filters.</td></tr>';
+    }
+
+    function startPendingCashDeposit(salesId) {
+      if (!ensureEditable('save entries')) return;
+      const sale = (appData.sales || []).find(s => String(s.id) === String(salesId));
+      if (!sale) {
+        showAlert('Related sales entry was not found.', 'error');
+        return;
+      }
+      const matchingDeposits = (appData.cash || []).filter(c => isSameTrainForCashSale(c, sale));
+      const deposited = matchingDeposits.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
+      const amountToCollect = getSaleCollectableAmount(sale);
+      const pending = Math.max(amountToCollect - deposited, 0);
+      if (pending <= 0 && !confirm('This sales entry has no pending balance. Add another deposit anyway?')) return;
+
+      editingId = null;
+      editingType = null;
+      document.getElementById('cashSalesEntryId') && (document.getElementById('cashSalesEntryId').value = sale.id || '');
+      document.getElementById('cashDate').value = getLastCashEntryDate() || new Date().toISOString().split('T')[0];
+      document.getElementById('cashArrivalDate') && (document.getElementById('cashArrivalDate').value = sale.arrivalDate || sale.date || '');
+      document.getElementById('cashYard').value = sale.yard || '';
+      document.getElementById('cashTrainId').value = sale.trainId || '';
+      document.getElementById('cashTrainSearch').value = sale.trainName || '';
+      document.getElementById('cashTrainNo').value = sale.trainNumber || '';
+      document.getElementById('cashTrainManager').value = sale.trainManager || '';
+      document.getElementById('cashRakeManager').value = sale.rakeManager || '';
+      document.getElementById('cashGpFromSales').value = amountToCollect || '';
+      document.getElementById('cashBalanceDue') && (document.getElementById('cashBalanceDue').value = pending);
+      document.getElementById('cashDepositCounter').value = '';
+      document.getElementById('cashOnlineDeposit').value = '';
+      document.getElementById('cashTotalDeposit').value = '';
+      document.getElementById('cashShortageReason').value = '';
+      document.getElementById('cashRemarks').value = pending > 0 ? `Pending deposit against arrival date ${formatDate(sale.arrivalDate || sale.date || '')}` : '';
+      checkShortage();
+      switchCashTab('entry');
+      showAlert(`Pending amount loaded: ${formatCurrency(pending)}. Enter cash/online deposit and save.`, 'info');
     }
 
     function findSalesEntryForCash(date, trainId, trainNumber, trainName, rakeManager = '', rakeNumber = '') {
@@ -6392,11 +6510,15 @@ function showPage(page) {
       const trainId = document.getElementById('cashTrainId').value;
       const trainNumber = document.getElementById('cashTrainNo')?.value || '';
       const trainName = document.getElementById('cashTrainSearch')?.value || '';
+      const forcedSalesEntryId = document.getElementById('cashSalesEntryId')?.value || '';
       const selected = trainId ? (appData.trainMasters || []).find(t => String(t.id) === String(trainId)) : null;
-      const salesEntry = date && (trainId || trainNumber || trainName)
+      const salesEntry = forcedSalesEntryId
+        ? (appData.sales || []).find(s => String(s.id) === String(forcedSalesEntryId))
+        : date && (trainId || trainNumber || trainName)
         ? findSalesEntryForCash(date, trainId, trainNumber, trainName, selected?.rakeManager || '', selected?.rakeNumber || '')
         : null;
       if (salesEntry) {
+        document.getElementById('cashSalesEntryId') && (document.getElementById('cashSalesEntryId').value = salesEntry.id || '');
         document.getElementById('cashGpFromSales').value = Number(salesEntry.amountToCollect || salesEntry.salesAchievement || salesEntry.totalSale) || 0;
         document.getElementById('cashTrainManager').value = salesEntry.trainManager || '';
         document.getElementById('cashRakeManager').value = salesEntry.rakeManager || '';
@@ -7924,7 +8046,9 @@ function showPage(page) {
 
     function switchCashTab(tab) {
       document.querySelectorAll('#page-cash .tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
+      const clickedTab = window.event?.target;
+      const fallbackTab = Array.from(document.querySelectorAll('#page-cash .tab')).find(t => t.textContent.toLowerCase().includes(tab === 'entry' ? 'new entry' : 'view entries'));
+      (clickedTab || fallbackTab)?.classList.add('active');
       document.getElementById('cashEntryTab').classList.toggle('hidden', tab !== 'entry');
       document.getElementById('cashListTab').classList.toggle('hidden', tab !== 'list');
       if (tab === 'list') loadCashList();
@@ -7939,6 +8063,7 @@ function showPage(page) {
 
     function selectCashTrain(id, name, number) {
       document.getElementById('cashTrainId').value = id;
+      document.getElementById('cashSalesEntryId') && (document.getElementById('cashSalesEntryId').value = '');
       document.getElementById('cashTrainSearch').value = name;
       document.getElementById('cashTrainNo').value = normalizeTrainNo(number) || number || '';
       document.getElementById('cashTrainDropdown').classList.remove('active');
@@ -7968,9 +8093,12 @@ function showPage(page) {
 
       if (!date || !yard || !document.getElementById('cashTrainId').value) { showAlert('Please select date, yard and train', 'error'); return; }
       const trainId = document.getElementById('cashTrainId').value;
+      const forcedSalesEntryId = document.getElementById('cashSalesEntryId')?.value || '';
       const train = trainId ? appData.trainMasters.find(t => t.id == trainId) : null;
-      const salesEntry = train ? findSalesEntryForCash(date, trainId, train.trainNumber, train.trainName, train.rakeManager, train.rakeNumber) : null;
-      if (!salesEntry) { showAlert('Cash deposit can be saved only after same-day sales entry for this exact train and rake manager.', 'error'); return; }
+      const salesEntry = forcedSalesEntryId
+        ? (appData.sales || []).find(s => String(s.id) === String(forcedSalesEntryId))
+        : train ? findSalesEntryForCash(date, trainId, train.trainNumber, train.trainName, train.rakeManager, train.rakeNumber) : null;
+      if (!salesEntry) { showAlert('Cash deposit can be saved only after a sales entry exists for this exact train and rake manager.', 'error'); return; }
 
       if (gpFromSales > 0 && (cashDeposit + onlineDeposit) < gpFromSales && !shortageReason) {
         showAlert('Please select a shortage reason. Cash + Online deposit is less than amount to be collected.', 'error');
@@ -7979,18 +8107,23 @@ function showPage(page) {
       }
 
       const effective = salesEntry || (train ? (resolveSelectedTrainMaster(trainId, train.trainNumber, train.trainName, date) || train) : null);
-      const duplicate = train ? findDuplicateEntry(appData.cash, date, train.trainNumber, train.trainName, editingId) : null;
-      if (duplicate && !confirm('Cash deposit data is already available for same train number and date. Overwrite existing entry?')) return;
+      const previousDeposits = (appData.cash || []).filter(c => String(c.id) !== String(editingId || '') && isSameTrainForCashSale(c, salesEntry));
+      const previousTotalDeposit = previousDeposits.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
+      const salesCollectable = Number(salesEntry?.amountToCollect || salesEntry?.salesAchievement || salesEntry?.totalSale || gpFromSales) || 0;
+      const pendingBeforeThisDeposit = Math.max(salesCollectable - previousTotalDeposit, 0);
+      if (!editingId && pendingBeforeThisDeposit <= 0 && !confirm('This sales entry already appears fully deposited. Save one more deposit record anyway?')) return;
+      if ((cashDeposit + onlineDeposit) > pendingBeforeThisDeposit && pendingBeforeThisDeposit > 0 && !confirm(`Deposit is more than pending amount (${formatCurrency(pendingBeforeThisDeposit)}). Save anyway?`)) return;
 
       const entry = {
         id: editingId || Date.now(),
         date: date,
         entryDate: date,
         arrivalDate: salesEntry?.arrivalDate || salesEntry?.date || date,
+        salesEntryId: salesEntry?.id || forcedSalesEntryId || '',
         yard: yard,
-        trainId: trainId,
-        trainName: train ? train.trainName : '',
-        trainNumber: train ? (normalizeTrainNo(train.trainNumber) || train.trainNumber || '') : '',
+        trainId: salesEntry?.trainId || trainId,
+        trainName: salesEntry?.trainName || (train ? train.trainName : ''),
+        trainNumber: salesEntry?.trainNumber || (train ? (normalizeTrainNo(train.trainNumber) || train.trainNumber || '') : ''),
         trainManager: effective?.trainManager || '',
         rakeManager: effective?.rakeManager || '',
         rakeManagerContact: effective?.rakeManagerContact || effective?.rakeManagerPhone || '',
@@ -7998,9 +8131,9 @@ function showPage(page) {
         rakeNumber: effective?.rakeNumber || '',
         businessHead: effective?.businessHead || '',
         vp: effective?.vp || '',
-        gpFromSales: gpFromSales,
-        amountToCollect: gpFromSales,
-        gpCollected: gpFromSales,
+        gpFromSales: salesCollectable || gpFromSales,
+        amountToCollect: salesCollectable || gpFromSales,
+        gpCollected: salesCollectable || gpFromSales,
         cashDepositCounter: cashDeposit,
         onlineDeposit: onlineDeposit,
         totalDeposit: cashDeposit + onlineDeposit,
@@ -8011,9 +8144,6 @@ function showPage(page) {
       if (editingId && editingType === 'cash') {
         const index = appData.cash.findIndex(c => c.id == editingId);
         if (index >= 0) appData.cash[index] = entry;
-      } else if (duplicate) {
-        const index = appData.cash.findIndex(c => c.id == duplicate.id);
-        if (index >= 0) appData.cash[index] = { ...entry, id: duplicate.id };
       } else {
         appData.cash.push(entry);
       }
@@ -8034,6 +8164,7 @@ function showPage(page) {
       document.getElementById('cashArrivalDate') && (document.getElementById('cashArrivalDate').value = '');
       document.getElementById('cashYard').value = appData.yards[0] || '';
       document.getElementById('cashTrainId').value = '';
+      document.getElementById('cashSalesEntryId') && (document.getElementById('cashSalesEntryId').value = '');
       document.getElementById('cashTrainSearch').value = '';
       document.getElementById('cashTrainNo').value = '';
       document.getElementById('cashTrainManager').value = '';
@@ -8113,6 +8244,7 @@ function showPage(page) {
       document.getElementById('cashArrivalDate') && (document.getElementById('cashArrivalDate').value = c.arrivalDate || relatedSale?.arrivalDate || relatedSale?.date || c.date || '');
       document.getElementById('cashYard').value = c.yard;
       document.getElementById('cashTrainId').value = c.trainId || '';
+      document.getElementById('cashSalesEntryId') && (document.getElementById('cashSalesEntryId').value = c.salesEntryId || relatedSale?.id || '');
       document.getElementById('cashTrainSearch').value = c.trainName || '';
       document.getElementById('cashTrainNo').value = c.trainNumber || '';
       document.getElementById('cashTrainManager').value = c.trainManager || '';
@@ -10054,8 +10186,8 @@ function showPage(page) {
       const fromDate = document.getElementById('cashDashFromDate')?.value;
       const toDate = document.getElementById('cashDashToDate')?.value;
       let cashData = [...(appData.cash || [])];
-      if (fromDate) cashData = cashData.filter(c => getCashDashboardDate(c) >= fromDate);
-      if (toDate) cashData = cashData.filter(c => getCashDashboardDate(c) <= toDate);
+      if (fromDate) cashData = cashData.filter(c => getCashEntryDate(c) >= fromDate);
+      if (toDate) cashData = cashData.filter(c => getCashEntryDate(c) <= toDate);
       downloadExcel(cashData, `cash_dashboard_${new Date().toISOString().split('T')[0]}.xlsx`); 
     }
 
@@ -10444,6 +10576,7 @@ function showPage(page) {
     window.clearCashForm = clearCashForm;
     window.editCashEntry = editCashEntry;
     window.deleteCashEntry = deleteCashEntry;
+    window.startPendingCashDeposit = startPendingCashDeposit;
     window.saveTrainMaster = saveTrainMaster;
     window.saveItemRateMaster = saveItemRateMaster;
     window.clearItemRateMasterForm = clearItemRateMasterForm;
