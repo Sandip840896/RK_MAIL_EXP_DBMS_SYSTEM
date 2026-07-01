@@ -3339,16 +3339,15 @@ console.log("✅ Connected to NEW Firebase");
           const snapshot = await firebaseDb.ref('rkGroupData').once('value');
           const cloudData = snapshot.val();
           if (cloudData) {
-            appData = decodeCloudData(cloudData);
+            const decodedCloudData = decodeCloudData(cloudData);
+            appData = decodedCloudData;
             const localData = await getLocalAppData();
             if (localData) {
               try {
-                const decodedCloudData = decodeCloudData(cloudData);
-                if ((localData.users || []).length > (decodedCloudData.users || []).length) {
-                  appData.users = mergeUsers(decodedCloudData.users || [], localData.users || []);
-                }
+                normalizeAppData();
+                appData = mergeCloudAndLocalData(decodedCloudData, localData);
               } catch (error) {
-                console.warn('Could not merge local users with Firebase users.', error);
+                console.warn('Could not merge local data with Firebase data.', error);
               }
             }
             normalizeAppData();
@@ -10699,10 +10698,39 @@ function showPage(page) {
       return decoded;
     }
 
+    function encodeDeletedRecords(records = {}) {
+      const encoded = {};
+      Object.entries(records || {}).forEach(([collectionName, rows]) => {
+        const safeCollection = encodeFirebaseKey(collectionName);
+        if (!safeCollection) return;
+        encoded[safeCollection] = {};
+        Object.entries(rows || {}).forEach(([key, value]) => {
+          const safeKey = encodeFirebaseKey(key);
+          if (safeKey) encoded[safeCollection][safeKey] = value;
+        });
+      });
+      return encoded;
+    }
+
+    function decodeDeletedRecords(records = {}) {
+      const decoded = {};
+      Object.entries(records || {}).forEach(([collectionName, rows]) => {
+        const realCollection = decodeFirebaseKey(collectionName);
+        if (!realCollection) return;
+        decoded[realCollection] = {};
+        Object.entries(rows || {}).forEach(([key, value]) => {
+          const realKey = decodeFirebaseKey(key);
+          if (realKey) decoded[realCollection][realKey] = value;
+        });
+      });
+      return decoded;
+    }
+
     function encodeCloudData(data = {}) {
       const copy = { ...(data || {}) };
       copy.trainManagerHierarchy = encodeHierarchyMap(copy.trainManagerHierarchy || {});
       copy.rakeManagerHierarchy = encodeHierarchyMap(copy.rakeManagerHierarchy || {});
+      copy.deletedRecords = encodeDeletedRecords(copy.deletedRecords || {});
       return copy;
     }
 
@@ -10711,6 +10739,7 @@ function showPage(page) {
       const copy = { ...(data || {}) };
       copy.trainManagerHierarchy = decodeHierarchyMap(copy.trainManagerHierarchy || {});
       copy.rakeManagerHierarchy = decodeHierarchyMap(copy.rakeManagerHierarchy || {});
+      copy.deletedRecords = decodeDeletedRecords(copy.deletedRecords || {});
       return copy;
     }
 
