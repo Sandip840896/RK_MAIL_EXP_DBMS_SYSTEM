@@ -6235,14 +6235,15 @@ function showPage(page) {
       let cashData = [...(appData.cash || [])];
       let salesData = [...(appData.sales || [])];
 
-      if (fromDate || toDate) { cashData = cashData.filter(c => isCashEntryInDateRange(c, fromDate, toDate)); }
+      if (fromDate || toDate) { cashData = cashData.filter(c => isCashReportEntryInDateRange(c, fromDate, toDate)); }
       if (fromDate) { salesData = salesData.filter(s => getSalesCashDate(s) >= fromDate); }
       if (toDate) { salesData = salesData.filter(s => getSalesCashDate(s) <= toDate); }
       if (yardFilter) { cashData = cashData.filter(c => c.yard === yardFilter); salesData = salesData.filter(s => s.yard === yardFilter); }
       if (managerFilter) { cashData = cashData.filter(c => getCashEntryManager(c) === managerFilter); salesData = salesData.filter(s => s.trainManager === managerFilter); }
 
+      const collectFromCashEntries = cashData.reduce((sum, c) => sum + getCashCollectableAmount(c), 0);
       const collectFromSalesEntries = salesData.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
-      const gpCollected = collectFromSalesEntries;
+      const gpCollected = cashData.length ? collectFromCashEntries : collectFromSalesEntries;
       const totalDeposit = cashData.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
       const cashCounter = cashData.reduce((sum, c) => sum + (Number(c.cashDepositCounter) || 0), 0);
       const onlineDeposit = cashData.reduce((sum, c) => sum + (Number(c.onlineDeposit) || 0), 0);
@@ -6288,6 +6289,16 @@ function showPage(page) {
 
     function getCashEntryDate(entry) {
       return getComparableDate(entry?.entryDate || entry?.depositDate || entry?.date || entry?.arrivalDate || '');
+    }
+
+    function getCashReportDate(entry) {
+      return getComparableDate(entry?.date || entry?.arrivalDate || entry?.entryDate || entry?.depositDate || '');
+    }
+
+    function isCashReportEntryInDateRange(entry, fromDate = '', toDate = '') {
+      const date = getCashReportDate(entry);
+      if (!date) return false;
+      return (!fromDate || date >= fromDate) && (!toDate || date <= toDate);
     }
 
     function getCashEntryDateCandidates(entry) {
@@ -6358,11 +6369,13 @@ function showPage(page) {
     function renderCashCollectionTable(cashData, salesData) {
       const tbody = document.getElementById('cashCollectionTableBody');
       if (!tbody) return;
-      const dates = [...new Set([...(salesData || []).map(getSalesCashDate), ...(cashData || []).map(getCashEntryDate)].filter(Boolean))].sort();
+      const dates = [...new Set([...(salesData || []).map(getSalesCashDate), ...(cashData || []).map(getCashReportDate)].filter(Boolean))].sort();
       const rows = dates.map(date => {
         const daySales = (salesData || []).filter(s => getSalesCashDate(s) === date);
-        const dayCash = (cashData || []).filter(c => getCashEntryDate(c) === date);
-        const amountToCollect = daySales.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
+        const dayCash = (cashData || []).filter(c => getCashReportDate(c) === date);
+        const amountToCollect = dayCash.length
+          ? dayCash.reduce((sum, c) => sum + getCashCollectableAmount(c), 0)
+          : daySales.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
         const cashDeposit = dayCash.reduce((sum, c) => sum + (Number(c.cashDepositCounter) || 0), 0);
         const onlineDeposit = dayCash.reduce((sum, c) => sum + (Number(c.onlineDeposit) || 0), 0);
         const totalDeposit = dayCash.reduce((sum, c) => sum + (Number(c.totalDeposit) || 0), 0);
@@ -6424,15 +6437,18 @@ function showPage(page) {
     function renderManagerCashTable(cashData, salesData) {
       const managerMap = {};
       
-      salesData.forEach(s => {
-        const manager = s.trainManager || 'Unassigned';
-        if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
-        managerMap[manager].gpAchievement += getSaleCollectableAmount(s);
-      });
+      if (!(cashData || []).length) {
+        salesData.forEach(s => {
+          const manager = s.trainManager || 'Unassigned';
+          if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
+          managerMap[manager].gpAchievement += getSaleCollectableAmount(s);
+        });
+      }
 
       cashData.forEach(c => {
         const manager = getCashEntryManager(c);
         if (!managerMap[manager]) managerMap[manager] = { gpAchievement: 0, cashDeposit: 0, onlineDeposit: 0, totalDeposit: 0 };
+        managerMap[manager].gpAchievement += getCashCollectableAmount(c);
         managerMap[manager].cashDeposit += Number(c.cashDepositCounter) || 0;
         managerMap[manager].onlineDeposit += Number(c.onlineDeposit) || 0;
         managerMap[manager].totalDeposit += Number(c.totalDeposit) || 0;
