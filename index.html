@@ -1898,7 +1898,7 @@
             <div class="kpi-card info">
               <div class="kpi-label">Total Sale To Collect</div>
               <div class="kpi-value" id="cashKpiGpCollected">₹0</div>
-              <div class="kpi-sub">From selected sales entries</div>
+              <div class="kpi-sub">From selected cash entries</div>
             </div>
             <div class="kpi-card success">
               <div class="kpi-label">Total Deposit</div>
@@ -6238,8 +6238,16 @@ function showPage(page) {
       if (fromDate || toDate) { cashData = cashData.filter(c => isCashReportEntryInDateRange(c, fromDate, toDate)); }
       if (fromDate) { salesData = salesData.filter(s => getSalesCashDate(s) >= fromDate); }
       if (toDate) { salesData = salesData.filter(s => getSalesCashDate(s) <= toDate); }
-      if (yardFilter) { cashData = cashData.filter(c => c.yard === yardFilter); salesData = salesData.filter(s => s.yard === yardFilter); }
-      if (managerFilter) { cashData = cashData.filter(c => getCashEntryManager(c) === managerFilter); salesData = salesData.filter(s => s.trainManager === managerFilter); }
+      if (yardFilter) {
+        const yardKey = normalizeText(yardFilter);
+        cashData = cashData.filter(c => normalizeText(c.yard) === yardKey);
+        salesData = salesData.filter(s => normalizeText(s.yard) === yardKey);
+      }
+      if (managerFilter) {
+        const managerKey = normalizeText(managerFilter);
+        cashData = cashData.filter(c => normalizeText(getCashEntryManager(c)) === managerKey);
+        salesData = salesData.filter(s => normalizeText(s.trainManager) === managerKey);
+      }
 
       const collectFromCashEntries = cashData.reduce((sum, c) => sum + getCashCollectableAmount(c), 0);
       const collectFromSalesEntries = salesData.reduce((sum, s) => sum + getSaleCollectableAmount(s), 0);
@@ -8457,14 +8465,23 @@ function showPage(page) {
 
       let filtered = [...(appData.cash || [])];
       
-      if (fromDate) filtered = filtered.filter(c => c.date >= fromDate);
-      if (toDate) filtered = filtered.filter(c => c.date <= toDate);
-      if (yardFilter) filtered = filtered.filter(c => c.yard === yardFilter);
-      if (trainFilter) filtered = filtered.filter(c => c.trainName === trainFilter);
+      if (fromDate) filtered = filtered.filter(c => getCashReportDate(c) >= fromDate);
+      if (toDate) filtered = filtered.filter(c => getCashReportDate(c) <= toDate);
+      if (yardFilter) {
+        const yardKey = normalizeText(yardFilter);
+        filtered = filtered.filter(c => normalizeText(c.yard) === yardKey);
+      }
+      if (trainFilter) {
+        const trainKey = normalizeText(trainFilter);
+        filtered = filtered.filter(c => normalizeText(c.trainName) === trainKey);
+      }
 
-      if (currentUser.yard !== 'ALL') filtered = filtered.filter(c => c.yard === currentUser.yard);
+      if (currentUser.yard !== 'ALL') {
+        const userYardKey = normalizeText(currentUser.yard);
+        filtered = filtered.filter(c => normalizeText(c.yard) === userYardKey);
+      }
 
-      filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+      filtered.sort((a, b) => new Date(getCashReportDate(b)) - new Date(getCashReportDate(a)));
       return filtered;
     }
 
