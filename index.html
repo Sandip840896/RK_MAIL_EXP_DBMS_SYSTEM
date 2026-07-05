@@ -1477,6 +1477,19 @@
                 </div>
               </div>
 
+              <div class="form-row">
+                <div class="form-field" style="grid-column: 1 / -1;">
+                  <label>PDF of Hisabexcel</label>
+                  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('supportHisabExcelPdf').click()" title="Upload Hisabexcel PDF">
+                      <i class="fas fa-file-pdf"></i> Upload PDF
+                    </button>
+                    <input type="file" id="supportHisabExcelPdf" accept="application/pdf,.pdf" style="display:none" onchange="handleSalesSupportUpload('hisabExcelPdf', this)">
+                    <span id="hisabExcelPdfPreview" style="font-size:12px;color:#64748b;">No Hisabexcel PDF attached.</span>
+                  </div>
+                </div>
+              </div>
+
               <div style="display: flex; gap: 10px; margin-top: 16px;">
                 <button class="btn btn-primary" onclick="validateAndSaveSalesEntry()">
                   <i class="fas fa-save"></i> Save Entry
@@ -6896,7 +6909,7 @@ function showPage(page) {
     }
 
     function setSalesEntryFieldsDisabled(disabled) {
-      ['salesDepartureDate','salesDate','salesRakeManager','salesAchievement','salesStoreBill','salesBaseExpense','salesCreditExpense','salesCashExpense','salesMiscExpense','salesStaffSalary','salesManagerSalary','salesECatering','salesRemarks'].forEach(id => {
+      ['salesDepartureDate','salesDate','salesRakeManager','salesAchievement','salesStoreBill','salesBaseExpense','salesCreditExpense','salesCashExpense','salesMiscExpense','salesStaffSalary','salesManagerSalary','salesECatering','salesRemarks','supportHisabExcelPdf'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.disabled = disabled;
       });
@@ -6946,6 +6959,7 @@ function showPage(page) {
       document.getElementById('salesGpAchievement').value = entry.gpAchievement || '';
       document.getElementById('salesGpAchievementPct').value = entry.gpTarget > 0 ? Math.round((entry.gpAchievement / entry.gpTarget) * 100) + '%' : '0%';
       document.getElementById('salesRemarks').value = entry.remarks || '';
+      renderHisabExcelPdfPreview();
       setSalesEntryFieldsDisabled(!!options.locked);
     }
 
@@ -7033,7 +7047,8 @@ function showPage(page) {
       storeBill: 'Store Bill',
       baseExpense: 'Base Expenses',
       creditExpense: 'Credit Expenses',
-      cashExpense: 'Cash Expenses'
+      cashExpense: 'Cash Expenses',
+      hisabExcelPdf: 'Hisab Excel PDF'
     };
 
     function getMiscLimitAmount() {
@@ -7070,20 +7085,39 @@ function showPage(page) {
       const files = Array.from(input.files || []);
       if (!SALES_SUPPORT_FIELDS[field] || !files.length) return;
       salesSupportFiles[field] = Array.isArray(salesSupportFiles[field]) ? salesSupportFiles[field] : [];
+      let attached = 0;
       for (const file of files) {
-        if (!file.type.startsWith('image/')) continue;
+        const isPdfField = field === 'hisabExcelPdf';
+        const isAllowed = isPdfField ? (file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '')) : file.type.startsWith('image/');
+        if (!isAllowed) continue;
         const dataUrl = await readFileAsDataUrl(file);
+        const extension = isPdfField ? 'pdf' : 'jpg';
         salesSupportFiles[field].push({
-          name: file.name || `${field}_${Date.now()}.jpg`,
-          type: file.type,
+          name: file.name || `${field}_${Date.now()}.${extension}`,
+          type: file.type || (isPdfField ? 'application/pdf' : 'image/jpeg'),
           size: file.size,
           uploadedAt: new Date().toISOString(),
           dataUrl
         });
+        attached += 1;
       }
       input.value = '';
-      showAlert(`${files.length} supporting image(s) attached for ${SALES_SUPPORT_FIELDS[field]}.`, 'success');
+      if (!attached) {
+        showAlert(`No valid ${field === 'hisabExcelPdf' ? 'PDF' : 'image'} file selected for ${SALES_SUPPORT_FIELDS[field]}.`, 'warning');
+        return;
+      }
+      showAlert(`${attached} supporting file(s) attached for ${SALES_SUPPORT_FIELDS[field]}.`, 'success');
       if (currentSalesDetailField === field) renderSalesSupportPreview(field);
+      if (field === 'hisabExcelPdf') renderHisabExcelPdfPreview();
+    }
+
+    function renderHisabExcelPdfPreview() {
+      const preview = document.getElementById('hisabExcelPdfPreview');
+      if (!preview) return;
+      const files = salesSupportFiles.hisabExcelPdf || [];
+      preview.innerHTML = files.length
+        ? `${files.length} PDF attached: ${files.map(f => f.name || 'Hisabexcel.pdf').join(', ')} <button type="button" class="btn btn-ghost btn-sm" onclick="openSalesSupportModalFromDraft('hisabExcelPdf')"><i class="fas fa-eye"></i> View</button>`
+        : 'No Hisabexcel PDF attached.';
     }
 
     function getSalesSupportCount(entryOrFiles) {
@@ -7102,7 +7136,7 @@ function showPage(page) {
       const files = salesSupportFiles[field] || [];
       container.innerHTML = `
         <div style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">
-          <strong>${SALES_SUPPORT_FIELDS[field]} Supporting Images:</strong> ${files.length}
+          <strong>${SALES_SUPPORT_FIELDS[field]} Supporting Files:</strong> ${files.length}
           ${files.length ? `<button class="btn btn-ghost btn-sm" style="margin-left:8px;" onclick="openSalesSupportModalFromDraft('${field}')"><i class="fas fa-eye"></i> View</button>` : ''}
         </div>
       `;
@@ -7118,7 +7152,7 @@ function showPage(page) {
       const files = Object.entries(SALES_SUPPORT_FIELDS).flatMap(([field, label]) =>
         (entry.supportingFiles?.[field] || []).map(file => ({ ...file, label }))
       );
-      openSalesSupportModalForFiles(`${entry.trainName || 'Sales'} Supporting Images`, files);
+      openSalesSupportModalForFiles(`${entry.trainName || 'Sales'} Supporting Files`, files);
     }
 
     function openSalesSupportModalForFiles(title, files) {
@@ -7127,9 +7161,14 @@ function showPage(page) {
       body.innerHTML = files.length ? files.map(file => `
         <div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#fff;">
           <div style="font-size:12px;font-weight:600;margin-bottom:6px;">${file.label || ''} ${file.name || ''}</div>
-          <img src="${file.dataUrl}" alt="${file.name || 'support'}" style="width:100%;max-height:260px;object-fit:contain;border-radius:6px;background:#f8fafc;">
+          ${file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '')
+            ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f8fafc;border-radius:6px;padding:12px;">
+                <span><i class="fas fa-file-pdf" style="color:#dc2626;"></i> ${file.name || 'PDF File'}</span>
+                <a class="btn btn-ghost btn-sm" href="${file.dataUrl}" target="_blank" download="${file.name || 'hisabexcel.pdf'}"><i class="fas fa-download"></i> Open/Download</a>
+              </div>`
+            : `<img src="${file.dataUrl}" alt="${file.name || 'support'}" style="width:100%;max-height:260px;object-fit:contain;border-radius:6px;background:#f8fafc;">`}
         </div>
-      `).join('') : '<p style="color:#64748b;">No supporting images attached.</p>';
+      `).join('') : '<p style="color:#64748b;">No supporting files attached.</p>';
       document.getElementById('salesSupportModal').classList.add('active');
     }
 
@@ -7662,6 +7701,7 @@ function showPage(page) {
       document.getElementById('salesGpAchievementPct').value = '';
       document.getElementById('salesRemarks').value = '';
       document.getElementById('remarksRequired').style.display = 'none';
+      renderHisabExcelPdfPreview();
     }
 
     function getFilteredSalesEntriesFromListFilters() {
@@ -7711,7 +7751,7 @@ function showPage(page) {
           <td>${s.yard}</td>
           <td>${formatCurrency(s.salesAchievement)}</td>
           <td>${formatCurrency(s.gpAchievement)}</td>
-          <td>${getSalesSupportCount(s) ? `<button class="btn btn-ghost btn-sm" onclick="openSalesSupportModal('${s.id}')"><i class="fas fa-image"></i> ${getSalesSupportCount(s)}</button>` : '-'}</td>
+          <td>${getSalesSupportCount(s) ? `<button class="btn btn-ghost btn-sm" onclick="openSalesSupportModal('${s.id}')"><i class="fas fa-paperclip"></i> ${getSalesSupportCount(s)}</button>` : '-'}</td>
           <td>${s.remarks || '-'}</td>
           <td>
             ${rowActions(s.id)}
@@ -10130,11 +10170,12 @@ function showPage(page) {
         'MISC Auto 1% Amount': s.miscAutoAmount || Math.round((Number(s.salesAchievement || s.totalSale) || 0) * 0.01),
         'MISC Difference': s.miscDifference || 0,
         'MISC Warning': s.miscWarning ? 'Yes' : 'No',
-        'Supporting Images Count': getSalesSupportCount(s),
+        'Supporting Files Count': getSalesSupportCount(s),
         'Store Bill Supporting': (s.supportingFiles?.storeBill || []).map(f => f.name).join(', '),
         'Base Expenses Supporting': (s.supportingFiles?.baseExpense || []).map(f => f.name).join(', '),
         'Credit Expenses Supporting': (s.supportingFiles?.creditExpense || []).map(f => f.name).join(', '),
         'Cash Expenses Supporting': (s.supportingFiles?.cashExpense || []).map(f => f.name).join(', '),
+        'Hisabexcel PDF': (s.supportingFiles?.hisabExcelPdf || []).map(f => f.name).join(', '),
         Commission: s.cashCommission || 0,
         'Staff Salary': s.staffSalary || 0,
         'Rake Manager Salary': s.managerSalary || 0,
